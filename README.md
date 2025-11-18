@@ -96,39 +96,39 @@ sequenceDiagram
   #define SILOG_FILE_MAX_LEN 64
   #define SILOG_MSG_MAX_LEN 256
 
-  typedef enum {
+    typedef enum {
       SILOG_DEBUG = 0,
       SILOG_INFO,
       SILOG_WARN,
       SILOG_ERROR,
       SILOG_FATAL
-  } silog_level_t;
+    } silogLevel_t;
 
-  // 打印日志（printf 风格）
-  void silog_log(silog_level_t level, const char *tag, const char *fmt, ...);
+    // 打印日志（printf 风格）
+    void silogLog(silogLevel_t level, const char *tag, const char *fmt, ...);
 
-  #define SILOGD(tag, fmt, ...) silog_log(SILOG_DEBUG, tag, fmt, ##__VA_ARGS__)
-  #define SILOGI(tag, fmt, ...) silog_log(SILOG_INFO,  tag, fmt, ##__VA_ARGS__)
-  #define SILOGW(tag, fmt, ...) silog_log(SILOG_WARN,  tag, fmt, ##__VA_ARGS__)
-  #define SILOGE(tag, fmt, ...) silog_log(SILOG_ERROR, tag, fmt, ##__VA_ARGS__)
-  #define SILOGF(tag, fmt, ...) silog_log(SILOG_FATAL, tag, fmt, ##__VA_ARGS__)
+    #define SILOGD(tag, fmt, ...) silogLog(SILOG_DEBUG, tag, fmt, ##__VA_ARGS__)
+    #define SILOGI(tag, fmt, ...) silogLog(SILOG_INFO,  tag, fmt, ##__VA_ARGS__)
+    #define SILOGW(tag, fmt, ...) silogLog(SILOG_WARN,  tag, fmt, ##__VA_ARGS__)
+    #define SILOGE(tag, fmt, ...) silogLog(SILOG_ERROR, tag, fmt, ##__VA_ARGS__)
+    #define SILOGF(tag, fmt, ...) silogLog(SILOG_FATAL, tag, fmt, ##__VA_ARGS__)
   ```
 
 - 定义ipc交互的log_entry
 
   ```c
-  typedef struct {
+    typedef struct {
       uint64_t ts;                          // 时间戳 (毫秒)
       pid_t pid;                             // 进程ID
       pid_t tid;                             // 线程ID
-      silog_level_t level;                   // 日志级别
+      silogLevel_t level;                   // 日志级别
       char tag[SILOG_TAG_MAX_LEN];           // 模块名
       char file[SILOG_FILE_MAX_LEN];         // 源文件名
       uint32_t line;                         // 行号
       char msg[SILOG_MSG_MAX_LEN];           // 日志正文
-      uint16_t msg_len;                      // 日志正文长度
+      uint16_t msgLen;                      // 日志正文长度
       uint8_t enabled;                       // 预测分支快速判断标志
-  } log_entry_t;
+    } logEntry_t;
   ```
 
 ## silogd守护进程

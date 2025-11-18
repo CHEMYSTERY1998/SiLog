@@ -1,6 +1,6 @@
 
-#ifndef SI_LOG_ENTRY_H
-#define SI_LOG_ENTRY_H
+#ifndef SILOG_ENTRY_H
+#define SILOG_ENTRY_H
 #include <stdint.h>
 #include <sys/types.h>
 
@@ -12,29 +12,28 @@ extern "C" {
 #define SILOG_FILE_MAX_LEN 64
 #define SILOG_MSG_MAX_LEN 256
 
-typedef enum
-{
+typedef enum {
     SILOG_DEBUG = 0,
     SILOG_INFO,
     SILOG_WARN,
     SILOG_ERROR,
     SILOG_FATAL
-} silog_level_t;
+} silogLevel_t;
 
 typedef struct {
     uint64_t ts;                   // 时间戳 (毫秒)
     pid_t pid;                     // 进程ID
     pid_t tid;                     // 线程ID
-    silog_level_t level;           // 日志级别
+    silogLevel_t level;            // 日志级别
     char tag[SILOG_TAG_MAX_LEN];   // 模块名
     char file[SILOG_FILE_MAX_LEN]; // 源文件名
     uint32_t line;                 // 行号
     char msg[SILOG_MSG_MAX_LEN];   // 日志正文
-    uint16_t msg_len;              // 日志正文长度
+    uint16_t msgLen;               // 日志正文长度
     uint8_t enabled;               // 预测分支快速判断标志
-} log_entry_t;
+} logEntry_t;
 
 #ifdef __cplusplus
 }
 #endif
-#endif // SI_LOG_ENTRY_H
+#endif // SILOG_ENTRY_H
