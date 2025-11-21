@@ -13,9 +13,9 @@
 #define LOGD_SOCKET_PATH "/tmp/logd.sock"
 
 /* 全局配置 */
-static int32_t gSockFd = -1;
-static silogLevel_t gMinLevel = SILOG_DEBUG;
-static pthread_mutex_t gLock = PTHREAD_MUTEX_INITIALIZER;
+static int32_t g_sockFd = -1;
+static silogLevel_t g_minLevel = SILOG_DEBUG;
+static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /* 获取线程ID */
 static pid_t getTid(void)
@@ -25,37 +25,36 @@ static pid_t getTid(void)
 
 static void silogInitSocket(void)
 {
-    if (__builtin_expect(gSockFd >= 0, 1)) {
+    if (__builtin_expect(g_sockFd >= 0, 1)) {
         return;
     }
 
-    pthread_mutex_lock(&gLock);
-    if (gSockFd < 0) {
-        gSockFd = socket(AF_UNIX, SOCK_DGRAM, 0);
-        if (gSockFd < 0) {
+    pthread_mutex_lock(&g_lock);
+    if (g_sockFd < 0) {
+        g_sockFd = socket(AF_UNIX, SOCK_DGRAM, 0);
+        if (g_sockFd < 0) {
             perror("socket");
-            pthread_mutex_unlock(&gLock);
+            pthread_mutex_unlock(&g_lock);
             return;
         }
     }
-    pthread_mutex_unlock(&gLock);
+    pthread_mutex_unlock(&g_lock);
 }
 
 /* 设置最小日志级别 */
 void silogSetLevel(silogLevel_t level)
 {
-    gMinLevel = level;
+    g_minLevel = level;
 }
 
-/* 预测分支判断 */
 static inline uint8_t silogCheckLevel(silogLevel_t level)
 {
-    return (level >= gMinLevel) ? 1 : 0;
+    return (level >= g_minLevel) ? 1 : 0;
 }
 
 /* 构造 log_entry */
 static void silogBuildEntry(logEntry_t *entry, silogLevel_t level, const char *tag, const char *file, uint32_t line,
-                              const char *fmt, ...)
+                            const char *fmt, ...)
 {
     memset(entry, 0, sizeof(*entry));
     entry->ts = (uint64_t)time(NULL) * 1000;
@@ -77,7 +76,7 @@ static void silogBuildEntry(logEntry_t *entry, silogLevel_t level, const char *t
 /* 发送 log_entry 到 logd */
 static void silogSend(const logEntry_t *entry)
 {
-    if (!entry || gSockFd < 0) {
+    if (!entry || g_sockFd < 0) {
         return;
     }
 
@@ -86,7 +85,7 @@ static void silogSend(const logEntry_t *entry)
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, LOGD_SOCKET_PATH, sizeof(addr.sun_path) - 1);
 
-    sendto(gSockFd, entry, sizeof(*entry), 0, (struct sockaddr *)&addr, sizeof(addr));
+    sendto(g_sockFd, entry, sizeof(*entry), 0, (struct sockaddr *)&addr, sizeof(addr));
 }
 
 /* 核心日志打印接口 */

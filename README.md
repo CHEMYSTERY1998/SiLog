@@ -1,6 +1,7 @@
 
 ---
 # 整体设计
+
 ## 1. 架构图
 
 ```mermaid
@@ -11,7 +12,7 @@ flowchart TB
         LOG_API --> LIBLOG
     end
 
-    subgraph SYSTEM["系统"]
+    subgraph SYSTEM["日志系统"]
         LIBLOG -- ipc通信/Domain Socket --> LOGD["logd 日志守护进程"]
         LOGD -->|写入| RINGBUF["内存环形缓冲区"]
         LOGD -->|可选写入| FILES["日志文件(轮转)"]
@@ -132,6 +133,29 @@ sequenceDiagram
   ```
 
 ## silogd守护进程
+
+### 模块 A：Unix Socket Server（接收日志）
+
+- bind `/tmp/silogd.sock`
+- 循环接收 log_entry
+- 放入内存环形缓冲区（可选）
+- 按需广播给连接的客户端
+
+### 模块 B：日志写文件（带轮转）
+
+- 写 log.txt
+- 达到上限（比如 10MB）→ log.txt 重命名 log.1.txt → 新建 log.txt
+- 使用 write()（文件 IO 不要用 fprintf）
+
+### 模块 C：客户端实时日志输出（logcat 功能）
+
+- logd 再开 **一个 UDS 监听端口** `/tmp/silogd_client.sock`
+- 客户端执行 `silogcat` → 连接
+- logd 将每条日志 **广播** 给所有连接的客户端
+
+### 模块 D：后台 Daemon 化
+
+
 
 
 

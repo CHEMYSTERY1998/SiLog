@@ -1,0 +1,54 @@
+silog/
+├── include/
+│   ├── silog.h
+│   ├── silog_entry.h
+│   └── silog_common.h
+│
+├── common/
+│   ├── silog_util.c
+│   ├── silog_util.h
+│   ├── silog_time.c
+│   ├── silog_time.h
+│   ├── silog_buffer.c
+│   ├── silog_buffer.h
+│   ├── silog_socket.c
+│   ├── silog_socket.h
+│   ├── silog_lock.c
+│   ├── silog_lock.h
+│   ├── silog_debug.c
+│   └── silog_debug.h
+│
+├── libsilog/
+│   ├── silog.c
+│   ├── silog_internal.c
+│   └── silog_internal.h
+│
+├── silogd/
+│   ├── silogd.c
+│   ├── silog_daemon.c
+│   ├── silog_daemon.h
+│   ├── silog_writer.c
+│   ├── silog_writer.h
+│   ├── silog_ringbuf.c
+│   ├── silog_ringbuf.h
+│   └── silog_config.c
+│
+├── silogcat/
+│   ├── main.c
+│   ├── silogcat_client.c
+│   └── silogcat_client.h
+│
+└── tests/
+
+
+使用场景：
+- 多进程记录日志，那还是要自己启动进程
+- 需要IPC
+- CS模型
+
+是否需要异步 send？
+一般情况下 不需要，因为 send() 写入内核缓冲区的速度很快，足够满足日志场景。
+只有在 日志量极大 或 缓冲区满 的情况下，send() 可能阻塞应用线程。这时可以考虑：
+使用 非阻塞模式（O_NONBLOCK），避免阻塞。
+或者在应用层做 异步队列，由专门的线程负责发送日志，避免业务线程卡住。
+
