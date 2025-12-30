@@ -18,13 +18,13 @@ typedef enum {
     SILOG_WARN,
     SILOG_ERROR,
     SILOG_FATAL
-} silogLevel_t;
+} silogLevel;
 
 typedef struct {
     uint64_t ts;                   // 时间戳 (毫秒)
     pid_t pid;                     // 进程ID
     pid_t tid;                     // 线程ID
-    silogLevel_t level;            // 日志级别
+    silogLevel level;              // 日志级别
     char tag[SILOG_TAG_MAX_LEN];   // 模块名
     char file[SILOG_FILE_MAX_LEN]; // 源文件名
     uint32_t line;                 // 行号
@@ -32,6 +32,8 @@ typedef struct {
     uint16_t msgLen;               // 日志正文长度
     uint8_t enabled;               // 预测分支快速判断标志
 } logEntry_t;
+
+void silogLog(silogLevel level, const char *tag, const char *file, uint32_t line, const char *fmt, ...);
 
 #ifdef __cplusplus
 }

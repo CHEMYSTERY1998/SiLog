@@ -5,15 +5,12 @@
 extern "C" {
 #endif
 
-
 #include <stdint.h>
 
 #define SILOGD_SOCKET_PATH "/tmp/silogd.sock"
 
-int32_t silogDaemonInitSocket(void);   // 创建并绑定 socket（Unix Domain）
-int32_t silogDaemonStartLoop(int32_t sockFd); // 主循环
-
-
+int32_t SilogDaemonInitSocket(void);          // 创建并绑定 socket（Unix Domain）
+int32_t SilogDaemonStartLoop(int32_t sockFd); // 主循环
 
 #ifdef __cplusplus
 }

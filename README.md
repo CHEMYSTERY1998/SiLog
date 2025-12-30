@@ -9,13 +9,16 @@ flowchart TB
     subgraph APP["应用程序 (任意进程)"]
         LOG_API["调用 LOG_INFO/LOG_ERROR 宏"]
         LIBLOG["liblog 日志库"]
+        SENDQUEUE["liblog queue"]
         LOG_API --> LIBLOG
+        LIBLOG -- 转线程处理 -->SENDQUEUE
+        
     end
 
     subgraph SYSTEM["日志系统"]
-        LIBLOG -- ipc通信/Domain Socket --> LOGD["logd 日志守护进程"]
+        SENDQUEUE -- ipc通信/Domain Socket --> LOGD["logd 日志守护进程"]
         LOGD -->|写入| RINGBUF["内存环形缓冲区"]
-        LOGD -->|可选写入| FILES["日志文件(轮转)"]
+        RINGBUF -->|可选写入| FILES["日志文件(轮转)"]
     end
 
     subgraph TOOLS["开发者工具"]
@@ -103,16 +106,16 @@ sequenceDiagram
       SILOG_WARN,
       SILOG_ERROR,
       SILOG_FATAL
-    } silogLevel_t;
+    } silogLevel;
 
     // 打印日志（printf 风格）
-    void silogLog(silogLevel_t level, const char *tag, const char *fmt, ...);
+    void silogLog(silogLevel level, const char *tag, const char *fmt, ...);
 
-    #define SILOGD(tag, fmt, ...) silogLog(SILOG_DEBUG, tag, fmt, ##__VA_ARGS__)
-    #define SILOGI(tag, fmt, ...) silogLog(SILOG_INFO,  tag, fmt, ##__VA_ARGS__)
-    #define SILOGW(tag, fmt, ...) silogLog(SILOG_WARN,  tag, fmt, ##__VA_ARGS__)
-    #define SILOGE(tag, fmt, ...) silogLog(SILOG_ERROR, tag, fmt, ##__VA_ARGS__)
-    #define SILOGF(tag, fmt, ...) silogLog(SILOG_FATAL, tag, fmt, ##__VA_ARGS__)
+    #define SILOG_D(tag, fmt, ...) silogLog(SILOG_DEBUG, tag, fmt, ##__VA_ARGS__)
+    #define SILOG_I(tag, fmt, ...) silogLog(SILOG_INFO,  tag, fmt, ##__VA_ARGS__)
+    #define SILOG_W(tag, fmt, ...) silogLog(SILOG_WARN,  tag, fmt, ##__VA_ARGS__)
+    #define SILOG_E(tag, fmt, ...) silogLog(SILOG_ERROR, tag, fmt, ##__VA_ARGS__)
+    #define SILOG_F(tag, fmt, ...) silogLog(SILOG_FATAL, tag, fmt, ##__VA_ARGS__)
   ```
 
 - 定义ipc交互的log_entry
@@ -122,7 +125,7 @@ sequenceDiagram
       uint64_t ts;                          // 时间戳 (毫秒)
       pid_t pid;                             // 进程ID
       pid_t tid;                             // 线程ID
-      silogLevel_t level;                   // 日志级别
+      silogLevel level;                   // 日志级别
       char tag[SILOG_TAG_MAX_LEN];           // 模块名
       char file[SILOG_FILE_MAX_LEN];         // 源文件名
       uint32_t line;                         // 行号
