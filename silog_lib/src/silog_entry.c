@@ -27,12 +27,14 @@ typedef struct {
     silogLevel minLevel;
     FILE *prelogFd;
     pthread_once_t initOnce;
+    bool initSuccess;
 } logEntryManager_t;
 
 STATIC logEntryManager_t g_logEntryMgr = {
     .minLevel = SILOG_DEBUG,
     .prelogFd = NULL,
     .initOnce = PTHREAD_ONCE_INIT,
+    .initSuccess = false,
 };
 
 /* 设置最小日志级别 */
@@ -138,7 +140,7 @@ STATIC void silogEntryMngInit(void)
         LOG_PRE_INFO("MPSC Send Task init failed, ret=%u", ret);
         return;
     }
-
+    g_logEntryMgr.initSuccess = true;
     LOG_PRE_INFO("SiLog socket initialized in constructor");
 }
 
@@ -146,6 +148,10 @@ STATIC void silogEntryMngInit(void)
 void silogLog(silogLevel level, const char *tag, const char *file, uint32_t line, const char *fmt, ...)
 {
     pthread_once(&g_logEntryMgr.initOnce, silogEntryMngInit);
+    if (!g_logEntryMgr.initSuccess) {
+        return;
+    }
+
     /* 日志级别过滤 */
     if (!silogCheckLevel(level)) {
         return;

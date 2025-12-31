@@ -7,7 +7,7 @@ uint64_t silogGetCurTimeMs(void)
     return (uint64_t)ts.tv_sec * 1000ULL + ts.tv_nsec / 1000000ULL;
 }
 
-STATIC pid_t getTid(void)
+pid_t getTid(void)
 {
     return (pid_t)syscall(SYS_gettid);
 }

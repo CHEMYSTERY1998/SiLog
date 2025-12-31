@@ -14,10 +14,10 @@
 extern "C" {
 #endif
 
-STATIC uint64_t silogGetCurTimeMs(void);
+uint64_t silogGetCurTimeMs(void);
 
 /* 获取线程ID */
-STATIC pid_t getTid(void);
+pid_t getTid(void);
 
 #ifdef __cplusplus
 }

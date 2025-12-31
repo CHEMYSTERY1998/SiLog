@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#include "silog.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -11,14 +13,6 @@ extern "C" {
 #define SILOG_TAG_MAX_LEN 32
 #define SILOG_FILE_MAX_LEN 64
 #define SILOG_MSG_MAX_LEN 256
-
-typedef enum {
-    SILOG_DEBUG = 0,
-    SILOG_INFO,
-    SILOG_WARN,
-    SILOG_ERROR,
-    SILOG_FATAL
-} silogLevel;
 
 typedef struct {
     uint64_t ts;                   // 时间戳 (毫秒)
@@ -32,8 +26,6 @@ typedef struct {
     uint16_t msgLen;               // 日志正文长度
     uint8_t enabled;               // 预测分支快速判断标志
 } logEntry_t;
-
-void silogLog(silogLevel level, const char *tag, const char *file, uint32_t line, const char *fmt, ...);
 
 #ifdef __cplusplus
 }
