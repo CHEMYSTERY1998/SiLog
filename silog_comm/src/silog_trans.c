@@ -27,7 +27,7 @@ typedef struct {
     void (*serverClose)();
 } SilogTranAgent;
 
-SilogTranAgent g_silogTranAgent = {0};
+static SilogTranAgent g_silogTranAgent = {0};
 
 // =========== UDP 传输实现 ===========
 STATIC void setNonblock(int32_t fd)

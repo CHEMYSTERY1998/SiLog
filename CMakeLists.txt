@@ -13,8 +13,10 @@ add_compile_options(-Wall -Wextra -Werror -DDEBUG)
 
 # 添加子目录
 add_subdirectory(silog_comm)
-add_subdirectory(silog_lib)
-# add_subdirectory(silog_d) add_subdirectory(silog_cat)
+add_subdirectory(silog_logger)
+add_subdirectory(silog_dae)
+add_subdirectory(silog_cat)
+add_subdirectory(silog_exe)
 
 add_subdirectory(test)
 

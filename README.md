@@ -12,21 +12,26 @@ flowchart TB
         SENDQUEUE["liblog queue"]
         LOG_API --> LIBLOG
         LIBLOG -- 转线程处理 -->SENDQUEUE
-        
+
     end
 
     subgraph SYSTEM["日志系统"]
         SENDQUEUE -- ipc通信/Domain Socket --> LOGD["logd 日志守护进程"]
         LOGD -->|写入| RINGBUF["内存环形缓冲区"]
+        LOGD -->|起广播服务线程| SERVICE["服务线程"]
         RINGBUF -->|可选写入| FILES["日志文件(轮转)"]
+        RINGBUF -->|传递日志信息|SERVICE
+
     end
 
     subgraph TOOLS["开发者工具"]
-        SILOG["silog 命令行工具"]
-        SILOG -- 连接socket / 控制接口 --> LOGD
+        SILOG_CAT_CLIENT1["silog 命令行工具"]
+        SILOG_CAT_CLIENT2["silog 命令行工具"]
+        SERVICE -- 广播日志信息 --> SILOG_CAT_CLIENT1
+        SERVICE -- 广播日志信息 --> SILOG_CAT_CLIENT2
     end
 
-    RINGBUF --> SILOG
+
 ```
 
 **特点**：
@@ -167,4 +172,18 @@ sequenceDiagram
 
 
 ## 编译构建
+
+
+
+
+## 模块依赖关系
+
+```mermaid
+graph TD
+    silog_exe --> silog_dae
+    silog_exe --> silog_cat
+    silog_cat --> silog_comm
+    silog_dae --> silog_comm
+    silog_logger --> silog_comm
+```
 

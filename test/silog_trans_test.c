@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "silog_entry.h"
+#include "silog_logger.h"
 #include "silog_error.h"
 #include "silog_trans.h"
 

@@ -1,4 +1,4 @@
-#include "silog_entry.h"
+#include "silog_logger.h"
 
 #include <errno.h>
 #include <pthread.h>

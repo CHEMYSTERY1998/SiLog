@@ -12,7 +12,7 @@
 
 #include "silog_error.h"
 #include "silog_trans.h"
-#include "silog_entry.h"
+#include "silog_logger.h"
 
 static const char *level_to_name(silogLevel level)
 {
