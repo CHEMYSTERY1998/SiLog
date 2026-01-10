@@ -11,6 +11,7 @@ extern "C" {
 
 // Daemon 服务端初始化接口
 int32_t SilogDaemonInit();
+void SilogDaemonDeinit();
 
 // Daemon 服务端初始化接口
 

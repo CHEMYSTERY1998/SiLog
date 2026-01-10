@@ -11,40 +11,21 @@
 #include <unistd.h>
 
 #include "silog_error.h"
-#include "silog_trans.h"
 #include "silog_logger.h"
+#include "silog_test_comm.h"
+#include "silog_time.h"
+#include "silog_trans.h"
+#include "silog_utils.h"
 
-static const char *level_to_name(silogLevel level)
-{
-    switch (level) {
-    case SILOG_DEBUG:
-        return "DEBUG";
-    case SILOG_INFO:
-        return "INFO";
-    case SILOG_WARN:
-        return "WARN";
-    case SILOG_ERROR:
-        return "ERROR";
-    case SILOG_FATAL:
-        return "FATAL";
-    default:
-        return "UNKNOWN";
-    }
-}
 void printEntry(const logEntry_t *entry)
 {
-    if (!entry)
+    if (!entry) {
         return;
-    /* 假设 ts 为毫秒时间戳 */
-    time_t sec = entry->ts / 1000;
-    long msec = entry->ts % 1000;
-    struct tm tm;
-    localtime_r(&sec, &tm);
+    }
     char timebuf[32];
-    strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S", &tm);
-
-    printf("[%s.%03ld][%s][pid:%d tid:%d][%s][%s:%u] %s\n", timebuf, msec, level_to_name(entry->level), entry->pid,
-           entry->tid, entry->tag, entry->file, entry->line, entry->msg);
+    SilogFormatWallClockMs(entry->ts, timebuf, sizeof(timebuf));
+    printf("[%s][%s][pid:%d tid:%d][%s][%s:%u] %s\n", timebuf, SilogLevelToName(entry->level), entry->pid, entry->tid,
+           entry->tag, entry->file, entry->line, entry->msg);
 }
 
 void *entryHandle(void *arg)
@@ -53,10 +34,10 @@ void *entryHandle(void *arg)
     SilogTransInit(TRAN_TYPE_UDP);
     int ret = SilogTransServerInit();
     if (ret != SILOG_OK) {
-        printf("SilogTransServerInit failed: %d\n", ret);
+        PRINTF("SilogTransServerInit failed: %d", ret);
         return NULL;
     }
-    printf("SilogTransServerInit success\n");
+    PRINTF("SilogTransServerInit success");
 
     logEntry_t entry;
     while (1) {
@@ -73,11 +54,24 @@ void createTestInitThread()
     pthread_t tid;
     int ret = pthread_create(&tid, NULL, entryHandle, NULL);
     if (ret != 0) {
-        printf("pthread_create failed: %d\n", ret);
+        PRINTF("pthread_create failed: %d", ret);
         return;
     }
 
     pthread_detach(tid);
+}
+
+// 随机usleep 100 ~ 5000 微秒
+void randomSleep()
+{
+    // 添加种子
+    static int seeded = 0;
+    if (!seeded) {
+        srand((unsigned int)time(NULL));
+        seeded = 1;
+    }
+    int usec = 100 + rand() % 4901;
+    usleep(usec);
 }
 
 int main()
@@ -87,13 +81,19 @@ int main()
     SILOG_I("DemoClient", "SiLog demo client started");
 
     for (int i = 0; i < 5; i++) {
+        randomSleep();
         SILOG_D("DemoClient", "Debug message %d", i);
+        randomSleep();
         SILOG_I("DemoClient", "Info message %d", i);
+        randomSleep();
         SILOG_W("DemoClient", "Warning message %d", i);
+        randomSleep();
         SILOG_E("DemoClient", "Error message %d", i);
+        randomSleep();
         SILOG_F("DemoClient", "Fatal message %d", i);
     }
 
+    randomSleep();
     SILOG_I("DemoClient", "SiLog demo client finished");
     sleep(1);
     return 0;

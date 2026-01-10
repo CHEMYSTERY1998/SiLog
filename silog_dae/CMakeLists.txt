@@ -1,7 +1,9 @@
 add_library(silog_dae SHARED ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_daemon.c)
 
 target_include_directories(silog_dae
-                           PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+                           PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
+                           PRIVATE ${PROJECT_SOURCE_DIR}/silog_logger/include
+                           PRIVATE ${PROJECT_SOURCE_DIR}/silog_comm/include)
 
 target_include_directories(
   silog_dae

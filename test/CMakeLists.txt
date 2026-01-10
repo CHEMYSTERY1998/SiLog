@@ -1,5 +1,5 @@
 # 定义可执行文件列表
-set(TEST_EXECUTABLES silog_logger_test silog_trans_test)
+set(TEST_EXECUTABLES silog_logger_test silog_trans_test silog_time_test)
 
 # 创建可执行文件
 foreach(executable ${TEST_EXECUTABLES})
@@ -19,6 +19,5 @@ foreach(executable ${TEST_EXECUTABLES})
     PRIVATE silog_logger
     PRIVATE silog_dae
     PRIVATE silog_cat
-    PRIVATE silog_common
     PRIVATE silog_common)
 endforeach()
