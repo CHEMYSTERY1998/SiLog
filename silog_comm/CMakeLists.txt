@@ -6,6 +6,7 @@ add_library(
   ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_time.c
   ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_mpsc.c)
 
-target_include_directories(silog_common PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(silog_common
+                           PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 set_property(TARGET silog_common PROPERTY POSITION_INDEPENDENT_CODE ON)

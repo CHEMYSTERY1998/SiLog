@@ -10,6 +10,7 @@ include_directories(${PROJECT_SOURCE_DIR}/interface)
 
 # 添加编译选项
 add_compile_options(-Wall -Wextra -Werror -DDEBUG)
+# add_compile_options(-DSILOG_EXE)
 add_compile_definitions(_GNU_SOURCE)
 
 # 添加子目录
@@ -22,5 +23,4 @@ add_subdirectory(test)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# 格式化命令
-# find . -name "CMakeLists.txt" -type f | xargs cmake-format -i
+# 格式化命令 find . -name "CMakeLists.txt" -type f | xargs cmake-format -i
