@@ -8,33 +8,25 @@
 
 int32_t SilogMpscQueueInit(SiLogMpscQueue *logQueue, uint32_t elementSize, uint32_t capacity)
 {
-    SiLogMpscQueue *newQue = (SiLogMpscQueue *)SiMalloc(sizeof(SiLogMpscQueue));
-    if (newQue == NULL) {
-        return SILOG_OUT_OF_MEMORY;
-    }
-
-    if (elementSize == 0 || capacity == 0) {
-        SiFree(newQue);
+    if (logQueue == NULL || elementSize == 0 || capacity == 0) {
         return SILOG_INVALID_ARG;
     }
 
-    // capacity 必须是 2 的幂
     if ((capacity & (capacity - 1)) != 0) {
-        SiFree(newQue);
         return SILOG_INVALID_ARG;
     }
 
-    newQue->buffer = SiMalloc(elementSize * capacity);
-    if (!newQue->buffer) {
-        SiFree(newQue);
+    logQueue->buffer = SiMalloc(elementSize * capacity);
+    if (!logQueue->buffer) {
         return SILOG_OUT_OF_MEMORY;
     }
 
-    logQueue = newQue;
     logQueue->capacity = capacity;
+    logQueue->elementSize = elementSize;
 
     atomic_store(&logQueue->writePos, 0);
     atomic_store(&logQueue->readPos, 0);
+
     return SILOG_OK;
 }
 
@@ -51,9 +43,14 @@ void SilogMpscQueueDestroy(SiLogMpscQueue *logQueue)
 
 int32_t SilogMpscQueuePush(SiLogMpscQueue *logQueue, const void *element)
 {
-    if (logQueue == NULL) {
+    if (logQueue == NULL || element == NULL) {
         return SILOG_INVALID_ARG;
     }
+
+    if (logQueue->buffer == NULL || logQueue->capacity == 0) {
+        return SILOG_TRANS_NOT_INIT;
+    }
+
     unsigned int write = atomic_fetch_add(&logQueue->writePos, 1);
     unsigned int read = atomic_load(&logQueue->readPos);
 
