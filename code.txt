@@ -67,3 +67,7 @@ silog_exe 为可执行文件，依赖silog_dae和silog_cat库
                  +----------------+
                  | silog_logger   |
                  +----------------+
+
+
+TODO:
+1、设计 liblog 的错误处理状态机

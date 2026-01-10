@@ -29,6 +29,7 @@ typedef struct {
     silogLevel minLevel;
     FILE *prelogFd;
     pthread_once_t initOnce;
+    SiLogMpscQueue logQueue;
     bool initSuccess;
 } logEntryManager_t;
 
@@ -92,7 +93,7 @@ STATIC void *silogEntrySendHandle(void *arg)
     (void)arg;
     while (1) {
         logEntry_t entry;
-        int32_t ret = SilogMpscQueuePop(&entry);
+        int32_t ret = SilogMpscQueuePop(&g_logEntryMgr.logQueue, &entry);
         if (ret != SILOG_OK) {
             usleep(1000); // 1ms
             continue;
@@ -131,7 +132,7 @@ STATIC void silogEntryMngInit(void)
         perror("fopen " LOG_REE_FILE_PATH " failed");
     }
 
-    int32_t ret = SilogMpscQueueInit(sizeof(logEntry_t), LOG_ENTRY_QUEUE_CAPACITY);
+    int32_t ret = SilogMpscQueueInit(&g_logEntryMgr.logQueue, sizeof(logEntry_t), LOG_ENTRY_QUEUE_CAPACITY);
     if (ret != SILOG_OK) {
         LOG_LOGGER_INFO("MPSC Queue init failed, ret=%u", ret);
         return;
@@ -165,7 +166,7 @@ void silogLog(silogLevel level, const char *tag, const char *file, uint32_t line
         LOG_LOGGER_INFO("silogBuildEntry failed, ret=%u", ret);
         return;
     }
-    ret = SilogMpscQueuePush(&entry);
+    ret = SilogMpscQueuePush(&g_logEntryMgr.logQueue, &entry);
     if (ret != SILOG_OK) {
         LOG_LOGGER_INFO("silogSend failed, ret=%u", ret);
         return;

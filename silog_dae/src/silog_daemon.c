@@ -34,6 +34,7 @@
 typedef struct {
     FILE *prelogFd;
     pthread_mutex_t lock;
+    SiLogMpscQueue logQueue;
 } SilogDaemonManager;
 
 SilogDaemonManager g_silogDaemonMgr = {
@@ -56,11 +57,12 @@ STATIC void *SilogDaemonRecvThreadFunc(void *arg)
         SILOG_DAEMON_E("SilogTransServerInit failed: %d", ret);
         return NULL;
     }
-    logEntry_t entry;
+    ret = SilogMpscQueueInit(&g_silogDaemonMgr.logQueue, sizeof(logEntry_t), 4096);
+        logEntry_t entry;
     while (1) {
         int32_t n = SilogTransServerRecv(&entry, sizeof(logEntry_t));
         if (n > 0) {
-            ret = SilogMpscQueuePush(&entry);
+            ret = SilogMpscQueuePush(&g_silogDaemonMgr.logQueue, &entry);
             if (ret != SILOG_OK) {
                 SILOG_DAEMON_E("SilogMpscQueuePush failed: %d", ret);
             }
@@ -90,7 +92,7 @@ STATIC void *SilogDaemonWriteThreadFunc(void *arg)
     (void)arg;
     logEntry_t entry;
     while (1) {
-        int32_t ret = SilogMpscQueuePop(&entry);
+        int32_t ret = SilogMpscQueuePop(&g_silogDaemonMgr.logQueue, &entry);
         if (ret == SILOG_OK) {
             // TODO:写入日志文件
             char timebuf[32];

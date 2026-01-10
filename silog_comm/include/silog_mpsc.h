@@ -12,17 +12,25 @@
 extern "C" {
 #endif
 
+typedef struct {
+    uint8_t *buffer;      // 环形缓冲区
+    uint32_t elementSize; // 每个元素大小
+    uint32_t capacity;    // 队列容量（必须是 2 的幂）
+    atomic_uint writePos; // 多生产者写指针
+    atomic_uint readPos;  // 单消费者读指针
+} SiLogMpscQueue;
+
 // 初始化队列（capacity 必须是 2 的幂）
-int32_t SilogMpscQueueInit(uint32_t elementSize, uint32_t capacity);
+int32_t SilogMpscQueueInit(SiLogMpscQueue *logQueue, uint32_t elementSize, uint32_t capacity);
 
 // 销毁队列
-void SilogMpscQueueDestroy();
+void SilogMpscQueueDestroy(SiLogMpscQueue *logQueue);
 
 // push：多生产者（永不阻塞）
-int32_t SilogMpscQueuePush(const void *element);
+int32_t SilogMpscQueuePush(SiLogMpscQueue *logQueue, const void *element);
 
 // pop：单消费者
-int32_t SilogMpscQueuePop(void *outElement);
+int32_t SilogMpscQueuePop(SiLogMpscQueue *logQueue, void *outElement);
 
 #ifdef __cplusplus
 }
