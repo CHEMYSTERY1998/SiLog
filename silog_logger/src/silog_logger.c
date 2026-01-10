@@ -17,13 +17,13 @@
 #include "silog_utils.h"
 
 #define LOG_ENTRY_QUEUE_CAPACITY 1024
-#define LOG_REE_FILE_PATH "/tmp/pre_silog.txt"
-#define LOG_LOGGER_INFO(fmt, ...)                                                                                         \
-    do {                                                                                                               \
-        int _err = errno;                                                                                              \
-        fprintf(g_logEntryMgr.prelogFd, "[%s:%d %s] [%s]: " fmt "\n", __FILE__, __LINE__, __func__, strerror(_err),    \
-                ##__VA_ARGS__);                                                                                        \
-    } while (0)
+#define LOG_REE_FILE_PATH "/tmp/silog_logger.txt"
+
+#define SILOG_LOGGER(...) silog_logger_log(__VA_ARGS__)
+#define SILOG_LOGGER_E(fmt, ...) SILOG_LOGGER("[ERROR]" fmt, ##__VA_ARGS__)
+#define SILOG_LOGGER_W(fmt, ...) SILOG_LOGGER("[WARNING]" fmt, ##__VA_ARGS__)
+#define SILOG_LOGGER_I(fmt, ...) SILOG_LOGGER("[INFO]" fmt, ##__VA_ARGS__)
+#define SILOG_LOGGER_D(fmt, ...) SILOG_LOGGER("[DEBUG]" fmt, ##__VA_ARGS__)
 
 typedef struct {
     silogLevel minLevel;
@@ -31,6 +31,7 @@ typedef struct {
     pthread_once_t initOnce;
     SiLogMpscQueue logQueue;
     bool initSuccess;
+    pthread_mutex_t lock;
 } logEntryManager_t;
 
 STATIC logEntryManager_t g_logEntryMgr = {
@@ -38,7 +39,37 @@ STATIC logEntryManager_t g_logEntryMgr = {
     .prelogFd = NULL,
     .initOnce = PTHREAD_ONCE_INIT,
     .initSuccess = false,
+    .lock = PTHREAD_MUTEX_INITIALIZER,
 };
+
+static inline void silog_logger_log(const char *fmt, ...)
+{
+    char buf[1024];
+    va_list ap;
+    int err = errno;
+    /* 1. 生成完整日志 */
+    int n = snprintf(buf, sizeof(buf), "[%s] ", strerror(err));
+    va_start(ap, fmt);
+    vsnprintf(buf + n, sizeof(buf) - n, fmt, ap);
+    va_end(ap);
+    strncat(buf, "\n", sizeof(buf) - strlen(buf) - 1);
+    pthread_mutex_lock(&g_logEntryMgr.lock);
+    /* 2. 输出目标集合 */
+#ifdef SILOG_EXE
+    FILE *fds[2] = {stdout, g_logEntryMgr.prelogFd};
+    int fdCount = 2;
+#else
+    FILE *fds[1] = {g_logEntryMgr.prelogFd ? g_logEntryMgr.prelogFd : stdout};
+    int fdCount = 1;
+#endif
+    for (int i = 0; i < fdCount; i++) {
+        if (!fds[i])
+            continue;
+        fputs(buf, fds[i]);
+        fflush(fds[i]);
+    }
+    pthread_mutex_unlock(&g_logEntryMgr.lock);
+}
 
 /* 设置最小日志级别 */
 void silogSetLevel(silogLevel level)
@@ -61,7 +92,7 @@ STATIC int32_t silogBuildEntry(logEntry_t *entry, silogLevel level, const char *
     va_start(args, fmt);
     int32_t n = vsnprintf(entry->msg, SILOG_MSG_MAX_LEN, fmt, args);
     if (n < 0) {
-        LOG_LOGGER_INFO("vsnprintf failed");
+        SILOG_LOGGER_E("vsnprintf failed");
         va_end(args);
         return SILOG_STR_ERR;
     }
@@ -74,11 +105,11 @@ STATIC int32_t silogBuildEntry(logEntry_t *entry, silogLevel level, const char *
     entry->line = line;
 
     if (snprintf(entry->tag, SILOG_TAG_MAX_LEN, "%s", tag) < 0) {
-        LOG_LOGGER_INFO("vsnprintf failed");
+        SILOG_LOGGER_E("vsnprintf failed");
         return SILOG_STR_ERR;
     }
     if (snprintf(entry->file, SILOG_FILE_MAX_LEN, "%s", file) < 0) {
-        LOG_LOGGER_INFO("vsnprintf failed");
+        SILOG_LOGGER_E("vsnprintf failed");
         return SILOG_STR_ERR;
     }
 
@@ -100,7 +131,7 @@ STATIC void *silogEntrySendHandle(void *arg)
         }
         ret = SilogTransClientSend(&entry, sizeof(logEntry_t));
         if (ret != SILOG_OK) {
-            LOG_LOGGER_INFO("SilogTransClientSend failed, ret=%u", ret);
+            SILOG_LOGGER_E("SilogTransClientSend failed, ret=%u", ret);
         }
     }
 }
@@ -111,13 +142,13 @@ STATIC int32_t silogEntrySendTaskInit(void)
     SilogTransInit(TRAN_TYPE_UDP);
     int32_t ret = SilogTransClientInit();
     if (ret != SILOG_OK) {
-        LOG_LOGGER_INFO("trans init failed, ret=%u", ret);
+        SILOG_LOGGER_E("trans init failed, ret=%u", ret);
         return ret;
     }
 
     ret = pthread_create(&tid, NULL, silogEntrySendHandle, NULL);
     if (ret != 0) {
-        LOG_LOGGER_INFO("pthread_create failed: %d", ret);
+        SILOG_LOGGER_E("pthread_create failed: %d", ret);
         return SILOG_THREAD_CREATE;
     }
 
@@ -134,17 +165,17 @@ STATIC void silogEntryMngInit(void)
 
     int32_t ret = SilogMpscQueueInit(&g_logEntryMgr.logQueue, sizeof(logEntry_t), LOG_ENTRY_QUEUE_CAPACITY);
     if (ret != SILOG_OK) {
-        LOG_LOGGER_INFO("MPSC Queue init failed, ret=%u", ret);
+        SILOG_LOGGER_E("MPSC Queue init failed, ret=%u", ret);
         return;
     }
 
     ret = silogEntrySendTaskInit();
     if (ret != SILOG_OK) {
-        LOG_LOGGER_INFO("MPSC Send Task init failed, ret=%u", ret);
+        SILOG_LOGGER_E("MPSC Send Task init failed, ret=%u", ret);
         return;
     }
     g_logEntryMgr.initSuccess = true;
-    LOG_LOGGER_INFO("SiLog socket initialized in constructor");
+    SILOG_LOGGER_I("SiLog socket initialized in constructor");
 }
 
 /* 核心日志打印接口 */
@@ -163,12 +194,12 @@ void silogLog(silogLevel level, const char *tag, const char *file, uint32_t line
     logEntry_t entry;
     int32_t ret = silogBuildEntry(&entry, level, tag, file, line, fmt);
     if (ret != SILOG_OK) {
-        LOG_LOGGER_INFO("silogBuildEntry failed, ret=%u", ret);
+        SILOG_LOGGER_E("silogBuildEntry failed, ret=%u", ret);
         return;
     }
     ret = SilogMpscQueuePush(&g_logEntryMgr.logQueue, &entry);
     if (ret != SILOG_OK) {
-        LOG_LOGGER_INFO("silogSend failed, ret=%u", ret);
+        SILOG_LOGGER_E("silogSend failed, ret=%u", ret);
         return;
     }
 }

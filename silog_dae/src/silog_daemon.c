@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <stdarg.h>
 
 #include "silog_adapter.h"
 #include "silog_error.h"
@@ -16,16 +17,7 @@
 
 #define LOG_DAEMON_FILE_PATH "/tmp/silog_daemon.txt"
 
-#define SILOG_DAEMON(fmt, ...)                                                                                         \
-    do {                                                                                                               \
-        int _err = errno;                                                                                              \
-        FILE *_fd = (g_silogDaemonMgr.prelogFd != NULL) ? g_silogDaemonMgr.prelogFd : stdout;                          \
-        pthread_mutex_lock(&g_silogDaemonMgr.lock);                                                                    \
-        fprintf(_fd, "[%s:%d %s] [%s]: " fmt "\n", __FILE__, __LINE__, __func__, strerror(_err), ##__VA_ARGS__);       \
-        fflush(_fd);                                                                                                   \
-        pthread_mutex_unlock(&g_silogDaemonMgr.lock);                                                                  \
-    } while (0)
-
+#define SILOG_DAEMON(...) silog_daemon_log(__VA_ARGS__)
 #define SILOG_DAEMON_E(fmt, ...) SILOG_DAEMON("[ERROR]" fmt, ##__VA_ARGS__)
 #define SILOG_DAEMON_W(fmt, ...) SILOG_DAEMON("[WARNING]" fmt, ##__VA_ARGS__)
 #define SILOG_DAEMON_I(fmt, ...) SILOG_DAEMON("[INFO]" fmt, ##__VA_ARGS__)
@@ -41,6 +33,35 @@ SilogDaemonManager g_silogDaemonMgr = {
     .prelogFd = NULL,
     .lock = PTHREAD_MUTEX_INITIALIZER,
 };
+
+static inline void silog_daemon_log(const char *fmt, ...)
+{
+    char buf[1024];
+    va_list ap;
+    int err = errno;
+    /* 1. 生成完整日志 */
+    int n = snprintf(buf, sizeof(buf), "[%s] ", strerror(err));
+    va_start(ap, fmt);
+    vsnprintf(buf + n, sizeof(buf) - n, fmt, ap);
+    va_end(ap);
+    strncat(buf, "\n", sizeof(buf) - strlen(buf) - 1);
+    pthread_mutex_lock(&g_silogDaemonMgr.lock);
+    /* 2. 输出目标集合 */
+#ifdef SILOG_EXE
+    FILE *fds[2] = {stdout, g_silogDaemonMgr.prelogFd};
+    int fdCount = 2;
+#else
+    FILE *fds[1] = {g_silogDaemonMgr.prelogFd ? g_silogDaemonMgr.prelogFd : stdout};
+    int fdCount = 1;
+#endif
+    for (int i = 0; i < fdCount; i++) {
+        if (!fds[i])
+            continue;
+        fputs(buf, fds[i]);
+        fflush(fds[i]);
+    }
+    pthread_mutex_unlock(&g_silogDaemonMgr.lock);
+}
 
 /*
     至少需要三个线程，
@@ -58,7 +79,7 @@ STATIC void *SilogDaemonRecvThreadFunc(void *arg)
         return NULL;
     }
     ret = SilogMpscQueueInit(&g_silogDaemonMgr.logQueue, sizeof(logEntry_t), 4096);
-        logEntry_t entry;
+    logEntry_t entry;
     while (1) {
         int32_t n = SilogTransServerRecv(&entry, sizeof(logEntry_t));
         if (n > 0) {
@@ -97,11 +118,8 @@ STATIC void *SilogDaemonWriteThreadFunc(void *arg)
             // TODO:写入日志文件
             char timebuf[32];
             SilogFormatWallClockMs(entry.ts, timebuf, sizeof(timebuf));
-            FILE *_fd = (g_silogDaemonMgr.prelogFd != NULL) ? g_silogDaemonMgr.prelogFd : stdout;
-            pthread_mutex_lock(&g_silogDaemonMgr.lock);
-            fprintf(_fd, "[%s][%s][pid:%d tid:%d][%s][%s:%u] %s\n", timebuf, SilogLevelToName(entry.level), entry.pid,
-                    entry.tid, entry.tag, entry.file, entry.line, entry.msg);
-            fflush(_fd);
+            printf("[%s][%s][pid:%d tid:%d][%s][%s:%u] %s\n", timebuf, SilogLevelToName(entry.level), entry.pid,
+                   entry.tid, entry.tag, entry.file, entry.line, entry.msg);
             pthread_mutex_unlock(&g_silogDaemonMgr.lock);
         } else {
             usleep(1000);
@@ -127,7 +145,7 @@ STATIC int32_t SilogDaemonWriteThreadInit()
 
 int32_t SilogDaemonInit()
 {
-    g_silogDaemonMgr.prelogFd = fopen(LOG_DAEMON_FILE_PATH, "a+");
+    g_silogDaemonMgr.prelogFd = fopen(LOG_DAEMON_FILE_PATH, "w");
     if (g_silogDaemonMgr.prelogFd == NULL) {
         perror("fopen " LOG_DAEMON_FILE_PATH " failed");
         return SILOG_FILE_OPEN;
