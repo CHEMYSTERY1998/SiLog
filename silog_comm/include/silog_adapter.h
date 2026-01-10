@@ -20,6 +20,12 @@ extern "C" {
 #endif
 #endif
 
+#if defined(_WIN32) || defined(_WIN64)
+#define SILOG_WINDOWS
+#else
+#define SILOG_LINUX
+#endif
+
 static inline void *SiMalloc(size_t size)
 {
     return malloc(size);
