@@ -17,9 +17,13 @@
 #include "silog_utils.h"
 
 #define LOG_ENTRY_QUEUE_CAPACITY 1024
-#define LOG_REE_FILE_PATH "/tmp/silog_logger.txt"
+#define LOG_REE_FILE_PATH        "/tmp/silog_logger.txt"
 
-#define SILOG_LOGGER(...) silog_logger_log(__VA_ARGS__)
+// 时间单位转换
+#define US_PER_MS    1000 // 微秒每毫秒
+#define LOG_BUF_SIZE 1024 // 日志缓冲区大小
+
+#define SILOG_LOGGER(...)        silog_logger_log(__VA_ARGS__)
 #define SILOG_LOGGER_E(fmt, ...) SILOG_LOGGER("[ERROR]" fmt, ##__VA_ARGS__)
 #define SILOG_LOGGER_W(fmt, ...) SILOG_LOGGER("[WARNING]" fmt, ##__VA_ARGS__)
 #define SILOG_LOGGER_I(fmt, ...) SILOG_LOGGER("[INFO]" fmt, ##__VA_ARGS__)
@@ -44,7 +48,7 @@ STATIC logEntryManager_t g_logEntryMgr = {
 
 static inline void silog_logger_log(const char *fmt, ...)
 {
-    char buf[1024];
+    char buf[LOG_BUF_SIZE];
     va_list ap;
     int err = errno;
     /* 1. 生成完整日志 */
@@ -63,8 +67,9 @@ static inline void silog_logger_log(const char *fmt, ...)
     int fdCount = 1;
 #endif
     for (int i = 0; i < fdCount; i++) {
-        if (!fds[i])
+        if (!fds[i]) {
             continue;
+        }
         fputs(buf, fds[i]);
         fflush(fds[i]);
     }
@@ -126,7 +131,7 @@ STATIC void *silogEntrySendHandle(void *arg)
         logEntry_t entry;
         int32_t ret = SilogMpscQueuePop(&g_logEntryMgr.logQueue, &entry);
         if (ret != SILOG_OK) {
-            usleep(1000); // 1ms
+            usleep(US_PER_MS);
             continue;
         }
         ret = SilogTransClientSend(&entry, sizeof(logEntry_t));

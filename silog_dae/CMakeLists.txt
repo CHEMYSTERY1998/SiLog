@@ -1,4 +1,6 @@
-add_library(silog_dae SHARED ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_daemon.c)
+add_library(silog_dae SHARED
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_daemon.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_file_manager.c)
 
 target_include_directories(
   silog_dae
@@ -11,4 +13,4 @@ target_include_directories(
   PUBLIC ${PROJECT_SOURCE_DIR}/interface
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_link_libraries(silog_dae PRIVATE silog_common)
+target_link_libraries(silog_dae PUBLIC silog_common pthread)

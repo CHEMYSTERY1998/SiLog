@@ -151,9 +151,58 @@ sequenceDiagram
 
 ### 模块 B：日志写文件（带轮转）
 
-- 写 log.txt
-- 达到上限（比如 10MB）→ log.txt 重命名 log.1.txt → 新建 log.txt
-- 使用 write()（文件 IO 不要用 fprintf）
+日志文件管理模块（`silog_file_manager`）负责日志的持久化存储和轮转管理。
+
+#### 文件命名规则
+
+```
+silog.log                    # 当前日志文件
+silog_20250127_153045.log    # 轮转后的历史文件（带时间戳：年月日_时分秒）
+silog_20250127_140230.log.gz # 压缩后的历史文件（可选）
+```
+
+#### 轮转策略
+
+当日志文件大小超过配置的 `maxFileSize`（默认 10MB）时触发轮转：
+
+1. 关闭当前日志文件
+2. 重命名为 `silog_YYYYMMDD_HHMMSS.log`
+3. 重新打开新的 `silog.log` 文件
+4. 删除最旧的历史文件（超过 `maxFileCount` 限制）
+5. 可选：异步压缩历史文件
+
+#### 刷盘模式
+
+- **同步刷盘（SYNC）**：每次写入后立即调用 `fflush()`
+- **异步刷盘（ASYNC，默认）**：
+  - 累积写入字节数达到 `asyncFlushSize`（默认 4KB）时刷盘
+  - 距离上次刷盘超过 `asyncFlushIntervalMs`（默认 1000ms）时刷盘
+
+#### 配置接口
+
+```c
+// 使用自定义配置初始化,传空使用默认配置初始化
+int32_t SilogFileManagerInitWithConfig(const SilogLogFileConfig *config);
+
+// 运行时配置接口
+void SilogFileManagerSetMaxFileSize(uint32_t size);
+void SilogFileManagerSetMaxFileCount(uint32_t count);
+void SilogFileManagerSetCompression(bool enable);
+void SilogFileManagerSetFlushMode(SilogFlushMode mode);
+// ...
+```
+
+#### 轮转失败处理
+
+- 轮转失败时进行重试（默认 3 次，每次间隔 100ms）
+- 重试失败后继续打开新文件写入日志，不阻塞日志系统
+- 记录错误到预日志文件
+
+#### 压缩支持
+
+- 可配置是否启用压缩（默认关闭）
+- 使用 gzip 压缩历史日志文件
+- 压缩操作在轮转后异步执行
 
 ### 模块 C：客户端实时日志输出（logcat 功能）
 

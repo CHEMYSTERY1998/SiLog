@@ -52,6 +52,8 @@ typedef enum {
     SILOG_TRANS_QUEUE_FULL,
     SILOG_TRANS_QUEUE_EMPTY,
 
+    SILOG_FILE_MANAGER_NOT_INIT,
+
 } ErrorCode;
 
 #ifdef __cplusplus

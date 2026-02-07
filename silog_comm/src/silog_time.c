@@ -5,6 +5,18 @@
 
 #include "silog_adapter.h"
 
+// ================ 常量定义 ================
+
+// 时间单位转换
+#define MS_PER_SEC 1000ULL    // 毫秒每秒
+#define US_PER_SEC 1000000ULL // 微秒每秒
+#define NS_PER_MS  10000ULL   // 纳秒每毫秒
+#define NS_PER_US  1000ULL    // 纳秒每微秒
+
+// 时间偏移
+#define YEAR_BASE_OFFSET  1900 // tm_year 基准年份
+#define MONTH_BASE_OFFSET 1    // tm_mon 基准月份
+
 #if defined(SILOG_WINDOWS)
 #include <windows.h>
 #elif defined(SILOG_LINUX)
@@ -27,14 +39,14 @@ uint64_t SilogGetNowMs(void)
     if (ui.QuadPart < EPOCH_DIFF) {
         return 0;
     }
-    return (ui.QuadPart - EPOCH_DIFF) / 10000ULL; /* → ms */
+    return (ui.QuadPart - EPOCH_DIFF) / NS_PER_MS; /* → ms */
 #elif defined(SILOG_LINUX)
     struct timespec ts;
     if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
         return 0;
     }
 
-    return (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
+    return (uint64_t)ts.tv_sec * MS_PER_SEC + (uint64_t)ts.tv_nsec / (NS_PER_US * US_PER_SEC);
 #endif
 }
 
@@ -52,14 +64,14 @@ uint64_t SilogGetMonoMs(void)
     QueryPerformanceCounter(&counter);
 
     /* 避免溢出：先除后乘 */
-    return (uint64_t)(counter.QuadPart * 1000ULL / freq.QuadPart);
+    return (uint64_t)(counter.QuadPart * MS_PER_SEC / freq.QuadPart);
 #elif defined(SILOG_LINUX)
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
         return 0;
     }
 
-    return (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
+    return (uint64_t)ts.tv_sec * MS_PER_SEC + (uint64_t)ts.tv_nsec / (NS_PER_US * US_PER_SEC);
 #endif
 }
 
@@ -70,8 +82,8 @@ void SilogFormatWallClockMs(uint64_t inputMs, char *buffer, uint32_t bufferLen)
     }
     buffer[0] = '\0';
 
-    uint64_t sec64 = inputMs / 1000;
-    uint32_t msec = (uint32_t)(inputMs % 1000);
+    uint64_t sec64 = inputMs / MS_PER_SEC;
+    uint32_t msec = (uint32_t)(inputMs % MS_PER_SEC);
     if (sec64 > (uint64_t)INT64_MAX) {
         return;
     }
@@ -89,8 +101,9 @@ void SilogFormatWallClockMs(uint64_t inputMs, char *buffer, uint32_t bufferLen)
     }
 #endif
 
-    int n = snprintf(buffer, bufferLen, "%04d-%02d-%02d %02d:%02d:%02d.%04u", tm_info.tm_year + 1900,
-                     tm_info.tm_mon + 1, tm_info.tm_mday, tm_info.tm_hour, tm_info.tm_min, tm_info.tm_sec, msec);
+    int n = snprintf(buffer, bufferLen, "%04d-%02d-%02d %02d:%02d:%02d.%04u", tm_info.tm_year + YEAR_BASE_OFFSET,
+                     tm_info.tm_mon + MONTH_BASE_OFFSET, tm_info.tm_mday, tm_info.tm_hour, tm_info.tm_min,
+                     tm_info.tm_sec, msec);
     if (n < 0 || (uint32_t)n >= bufferLen) {
         buffer[bufferLen - 1] = '\0';
     }
