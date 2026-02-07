@@ -45,25 +45,25 @@ void SilogPQueueClear(SiLogPQueue *queue)
 }
 
 // 判断队列是否为空
-bool SiLogPQueueIsEmpty(const SiLogPQueue *queue)
+bool SilogPQueueIsEmpty(const SiLogPQueue *queue)
 {
     return (queue == NULL) ? true : (queue->size == 0);
 }
 
 // 判断队列是否已满
-bool SiLogPQueueIsFull(const SiLogPQueue *queue)
+bool SilogPQueueIsFull(const SiLogPQueue *queue)
 {
     return (queue == NULL) ? true : (queue->size >= queue->capacity);
 }
 
 // 获取队列中元素个数
-uint32_t SiLogPQueueSize(const SiLogPQueue *queue)
+uint32_t SilogPQueueSize(const SiLogPQueue *queue)
 {
     return (queue == NULL) ? 0 : queue->size;
 }
 
 // 获取队列容量
-uint32_t SiLogPQueueCapacity(const SiLogPQueue *queue)
+uint32_t SilogPQueueCapacity(const SiLogPQueue *queue)
 {
     return (queue == NULL) ? 0 : queue->capacity;
 }
@@ -191,7 +191,7 @@ int32_t SilogPQueuePop(SiLogPQueue *queue, void *outElement)
 }
 
 // 获取堆顶元素（不删除）
-int32_t SiLogPQueuePeek(const SiLogPQueue *queue, void *outElement)
+int32_t SilogPQueuePeek(const SiLogPQueue *queue, void *outElement)
 {
     if (queue == NULL || outElement == NULL) {
         return SILOG_INVALID_ARG;
