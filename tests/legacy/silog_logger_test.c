@@ -31,7 +31,7 @@ void printEntry(const logEntry_t *entry)
 void *entryHandle(void *arg)
 {
     (void)arg;
-    SilogTransInit(TRAN_TYPE_UDP);
+    SilogTransInit(SILOG_TRAN_TYPE_UDP);
     int ret = SilogTransServerInit();
     if (ret != SILOG_OK) {
         PRINTF("SilogTransServerInit failed: %d", ret);

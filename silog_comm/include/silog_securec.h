@@ -49,9 +49,9 @@
 #ifndef SILOG_SECURC_H
 #define SILOG_SECURC_H
 
+#include <errno.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <errno.h>
 
 /* 定义 errno_t 类型（C11 Annex K） */
 #ifndef errno_t
@@ -193,9 +193,7 @@ size_t strnlen_s(const char *str, size_t strMax);
  * 与标准 strcmp 不同，strcmp_s 提供边界检查，
  * 并通过输出参数返回结果（更符合安全函数设计模式）。
  */
-errno_t strcmp_s(const char *str1, size_t str1Max,
-                 const char *str2, size_t str2Max,
-                 int *result);
+errno_t strcmp_s(const char *str1, size_t str1Max, const char *str2, size_t str2Max, int *result);
 
 /**
  * @brief 安全的字符串截断比较函数
@@ -208,9 +206,7 @@ errno_t strcmp_s(const char *str1, size_t str1Max,
  * @param result 比较结果输出
  * @return errno_t EOK 成功，EINVAL 失败
  */
-errno_t strncmp_s(const char *str1, size_t str1Max,
-                  const char *str2, size_t str2Max,
-                  size_t count, int *result);
+errno_t strncmp_s(const char *str1, size_t str1Max, const char *str2, size_t str2Max, size_t count, int *result);
 
 /**
  * @brief 安全的字符查找函数
@@ -251,9 +247,7 @@ errno_t strrchr_s(const char *str, size_t strMax, int c, size_t *position);
  *
  * 与标准 strstr 不同，strstr_s 通过输出参数返回位置。
  */
-errno_t strstr_s(const char *str, size_t strMax,
-                 const char *substr, size_t substrMax,
-                 size_t *position);
+errno_t strstr_s(const char *str, size_t strMax, const char *substr, size_t substrMax, size_t *position);
 
 /* ==================== 字符串标记函数 ==================== */
 
@@ -324,8 +318,7 @@ int vsprintf_s(char *dest, size_t destMax, const char *format, va_list argList);
  * @param argList 可变参数列表
  * @return int 成功时返回写入的字符数（不包括空字符），失败时返回 -1
  */
-int vsnprintf_s(char *dest, size_t destMax, size_t count,
-                const char *format, va_list argList);
+int vsnprintf_s(char *dest, size_t destMax, size_t count, const char *format, va_list argList);
 
 /* ==================== 格式化输入函数 ==================== */
 
@@ -354,8 +347,7 @@ int sscanf_s(const char *buffer, size_t bufferSize, const char *format, ...);
  * @param argList 可变参数列表
  * @return int 成功时返回成功匹配的项目数，失败时返回 EOF
  */
-int vsscanf_s(const char *buffer, size_t bufferSize,
-              const char *format, va_list argList);
+int vsscanf_s(const char *buffer, size_t bufferSize, const char *format, va_list argList);
 
 /**
  * @brief 安全的流格式化输入函数

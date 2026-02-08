@@ -12,10 +12,10 @@
 #include "silog_adapter.h"
 #include "silog_error.h"
 #include "silog_mpsc.h"
+#include "silog_securec.h"
 #include "silog_time.h"
 #include "silog_trans.h"
 #include "silog_utils.h"
-#include "silog_securec.h"
 
 #define LOG_ENTRY_QUEUE_CAPACITY 1024
 #define LOG_REE_FILE_PATH        "/tmp/silog_logger.txt"
@@ -145,7 +145,7 @@ STATIC void *silogEntrySendHandle(void *arg)
 STATIC int32_t silogEntrySendTaskInit(void)
 {
     pthread_t tid;
-    SilogTransInit(TRAN_TYPE_UDP);
+    SilogTransInit(SILOG_TRAN_TYPE_UDP);
     int32_t ret = SilogTransClientInit();
     if (ret != SILOG_OK) {
         SILOG_LOGGER_E("trans init failed, ret=%u", ret);

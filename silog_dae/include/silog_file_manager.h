@@ -20,8 +20,8 @@ typedef enum {
 
 /* 压缩模式 */
 typedef enum {
-    SILOG_COMPRESS_SYNC = 0,  /* 同步压缩（阻塞直到压缩完成） */
-    SILOG_COMPRESS_ASYNC,     /* 异步压缩（后台线程处理） */
+    SILOG_COMPRESS_SYNC = 0, /* 同步压缩（阻塞直到压缩完成） */
+    SILOG_COMPRESS_ASYNC,    /* 异步压缩（后台线程处理） */
 } SilogCompressMode;
 
 /* 日志文件配置 */

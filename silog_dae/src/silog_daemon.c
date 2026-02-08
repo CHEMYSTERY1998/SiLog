@@ -12,10 +12,10 @@
 #include "silog_file_manager.h"
 #include "silog_logger.h"
 #include "silog_mpsc.h"
+#include "silog_securec.h"
 #include "silog_time.h"
 #include "silog_trans.h"
 #include "silog_utils.h"
-#include "silog_securec.h"
 
 #define LOG_DAEMON_FILE_PATH "/tmp/silog_daemon.txt"
 
@@ -79,7 +79,7 @@ static inline void silog_daemon_log(const char *fmt, ...)
 */
 STATIC void *SilogDaemonRecvThreadFunc(void *arg)
 {
-    SilogTransInit(TRAN_TYPE_UDP);
+    SilogTransInit(SILOG_TRAN_TYPE_UDP);
     (void)arg;
     int32_t ret = SilogTransServerInit();
     if (ret != SILOG_OK) {
@@ -167,9 +167,9 @@ STATIC int32_t SilogDaemonWriteThreadInit()
     return SILOG_OK;
 }
 
-int32_t SilogDaemonInit()
+int32_t SilogDaemonInit(void)
 {
-    // 初始化日志文件管理器
+    /* 初始化日志文件管理器 */
     int32_t ret = SilogFileManagerInit(NULL);
     if (ret != SILOG_OK) {
         SILOG_DAEMON_E("SilogFileManagerInit failed: %d", ret);
@@ -182,26 +182,26 @@ int32_t SilogDaemonInit()
         return SILOG_FILE_OPEN;
     }
 
-    // 初始化日志接收线程
+    /* 初始化日志接收线程 */
     ret = SilogDaemonRecvThreadInit();
     if (ret != SILOG_OK) {
         return ret;
     }
 
-    // 初始化日志写入线程
+    /* 初始化日志写入线程 */
     ret = SilogDaemonWriteThreadInit();
     if (ret != SILOG_OK) {
         SILOG_DAEMON_E("SilogDaemonWriteThreadInit failed: %d", ret);
         return ret;
     }
 
-    // 初始化日志传输线程
-    // SilogDaemonTransThreadInit();
+    /* 初始化日志传输线程 */
+    /* SilogDaemonTransThreadInit(); */
 
     return SILOG_OK;
 }
 
-void SilogDaemonDeinit()
+void SilogDaemonDeinit(void)
 {
     if (g_silogDaemonMgr.prelogFd != NULL) {
         pthread_mutex_lock(&g_silogDaemonMgr.lock);
@@ -212,6 +212,6 @@ void SilogDaemonDeinit()
     }
     pthread_mutex_destroy(&g_silogDaemonMgr.lock);
 
-    // 反初始化日志文件管理器
+    /* 反初始化日志文件管理器 */
     SilogFileManagerDeinit();
 }

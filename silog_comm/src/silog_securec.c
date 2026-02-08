@@ -7,10 +7,10 @@
  */
 
 #include "silog_securec.h"
-#include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* ==================== 内存操作函数 ==================== */
 
@@ -185,9 +185,7 @@ size_t strnlen_s(const char *str, size_t strMax)
     return strnlen(str, strMax);
 }
 
-errno_t strcmp_s(const char *str1, size_t str1Max,
-                 const char *str2, size_t str2Max,
-                 int *result)
+errno_t strcmp_s(const char *str1, size_t str1Max, const char *str2, size_t str2Max, int *result)
 {
     if (result == NULL) {
         return EINVAL;
@@ -231,9 +229,7 @@ errno_t strcmp_s(const char *str1, size_t str1Max,
     return EOK;
 }
 
-errno_t strncmp_s(const char *str1, size_t str1Max,
-                  const char *str2, size_t str2Max,
-                  size_t count, int *result)
+errno_t strncmp_s(const char *str1, size_t str1Max, const char *str2, size_t str2Max, size_t count, int *result)
 {
     if (result == NULL) {
         return EINVAL;
@@ -318,9 +314,7 @@ errno_t strrchr_s(const char *str, size_t strMax, int c, size_t *position)
     return EINVAL;
 }
 
-errno_t strstr_s(const char *str, size_t strMax,
-                 const char *substr, size_t substrMax,
-                 size_t *position)
+errno_t strstr_s(const char *str, size_t strMax, const char *substr, size_t substrMax, size_t *position)
 {
     if (position == NULL) {
         return EINVAL;
@@ -490,8 +484,7 @@ int vsprintf_s(char *dest, size_t destMax, const char *format, va_list argList)
     return result;
 }
 
-int vsnprintf_s(char *dest, size_t destMax, size_t count,
-                const char *format, va_list argList)
+int vsnprintf_s(char *dest, size_t destMax, size_t count, const char *format, va_list argList)
 {
     if (dest == NULL || destMax == 0) {
         return -1;
@@ -557,8 +550,7 @@ int sscanf_s(const char *buffer, size_t bufferSize, const char *format, ...)
     return result;
 }
 
-int vsscanf_s(const char *buffer, size_t bufferSize,
-              const char *format, va_list argList)
+int vsscanf_s(const char *buffer, size_t bufferSize, const char *format, va_list argList)
 {
     (void)bufferSize; /* 参数保留用于未来增强 */
 

@@ -15,40 +15,45 @@
 #include "silog_error.h"
 #include "silog_mpsc.h"
 #include "silog_pqueue.h"
+#include "silog_securec.h"
 #include "silog_time.h"
 #include "silog_utils.h"
-#include "silog_securec.h"
 
 // ================ 常量定义 ================
 
-// 数据单位
-#define BYTE_SIZE 1 // 字节大小
+/* 数据单位 */
+#define BYTE_SIZE 1 /* 字节大小 */
 
-// 时间单位转换
-#define MS_PER_SEC 1000 // 毫秒每秒
-#define US_PER_MS  1000 // 微秒每毫秒
+/* 时间单位转换 */
+#define MS_PER_SEC 1000    /* 毫秒每秒 */
+#define US_PER_MS  1000    /* 微秒每毫秒 */
+#define US_PER_SEC 1000000 /* 微秒每秒 */
 
-// 缓冲区大小
-#define TIME_BUF_SIZE      32  // 时间字符串缓冲区大小
-#define PATTERN_BUF_SIZE   128 // 模式匹配缓冲区大小
-#define CMD_ARG_BUF_SIZE   32  // 命令参数缓冲区大小
-#define MAX_LOG_FILE_COUNT 128 // 最大日志文件数量
+/* 缓冲区大小 */
+#define TIME_BUF_SIZE      32  /* 时间字符串缓冲区大小 */
+#define PATTERN_BUF_SIZE   128 /* 模式匹配缓冲区大小 */
+#define CMD_ARG_BUF_SIZE   32  /* 命令参数缓冲区大小 */
+#define MAX_LOG_FILE_COUNT 128 /* 最大日志文件数量 */
 
-// 默认配置
+/* 文件轮转相关 */
+#define MAX_SEQ_RETRY_COUNT 10    /* 文件名序列号最大重试次数 */
+#define COMPRESS_SLEEP_US   10000 /* 压缩线程休眠时间（微秒） */
+
+/* 默认配置 */
 #define DEFAULT_LOG_DIR                 "/tmp/silog"
 #define DEFAULT_LOG_FILE_BASE           "silog"
-#define DEFAULT_MAX_FILE_SIZE           (10 * 1024 * 1024) // 10MB
+#define DEFAULT_MAX_FILE_SIZE           (10 * 1024 * 1024) /* 10MB */
 #define DEFAULT_MAX_FILE_COUNT          10
 #define DEFAULT_ENABLE_COMPRESSION      true
 #define DEFAULT_COMPRESS_MODE           SILOG_COMPRESS_ASYNC
 #define DEFAULT_FLUSH_MODE              SILOG_FLUSH_ASYNC
 #define DEFAULT_ASYNC_FLUSH_INTERVAL_MS 1000
-#define DEFAULT_ASYNC_FLUSH_SIZE        (4 * 1024) // 4KB
+#define DEFAULT_ASYNC_FLUSH_SIZE        (4 * 1024) /* 4KB */
 #define DEFAULT_ROTATE_RETRY_COUNT      3
 #define DEFAULT_ROTATE_RETRY_DELAY_MS   100
 
 #define PATH_MAX_LEN          512
-#define COMPRESS_QUEUE_SIZE   64 // 压缩队列容量（必须是 2 的幂）
+#define COMPRESS_QUEUE_SIZE   64 /* 压缩队列容量（必须是 2 的幂） */
 #define COMPRESS_PATH_MAX_LEN 512
 
 // 压缩任务
@@ -213,12 +218,12 @@ STATIC void *CompressThreadFunc(void *arg)
         if (ret == SILOG_OK) {
             DoCompressFile(task.filePath);
         } else {
-            // 队列为空，短暂休眠
-            usleep(10000); // 10ms
+            /* 队列为空，短暂休眠 */
+            usleep(COMPRESS_SLEEP_US);
         }
     }
 
-    // 线程退出前处理剩余任务
+    /* 线程退出前处理剩余任务 */
     CompressTask task;
     while (SilogMpscQueuePop(&g_fileManager.compressQueue, &task) == SILOG_OK) {
         DoCompressFile(task.filePath);
@@ -260,9 +265,9 @@ STATIC int32_t RotateInternal(void)
 
     GetCurrentLogFilePath(currentPath, sizeof(currentPath));
     FormatTimestampForFilename(SilogGetNowMs(), timestamp, sizeof(timestamp));
-    // 处理文件名冲突：如果文件已存在，添加序列号
+    /* 处理文件名冲突：如果文件已存在，添加序列号 */
     uint32_t seq = 0;
-    while (seq < 10) { // 最多尝试 10 个序列号
+    while (seq < MAX_SEQ_RETRY_COUNT) {
         if (seq == 0) {
             snprintf(historyPath, sizeof(historyPath), "%s/%s_%s.log", g_fileManager.config.logDir,
                      g_fileManager.config.logFileBase, timestamp);
@@ -332,8 +337,7 @@ STATIC int32_t SilogFileManagerInitWithConfig(const SilogLogFileConfig *config)
     }
 
     // 复制配置
-    (void)memcpy_s(&g_fileManager.config, sizeof(g_fileManager.config),
-                   config, sizeof(SilogLogFileConfig));
+    (void)memcpy_s(&g_fileManager.config, sizeof(g_fileManager.config), config, sizeof(SilogLogFileConfig));
 
     // 确保目录存在
     int32_t ret = EnsureLogDirExists();

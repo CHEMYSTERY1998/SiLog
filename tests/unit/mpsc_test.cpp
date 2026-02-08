@@ -1,18 +1,15 @@
 #include "silog_mpsc.h"
 
+#include <atomic>
 #include <gtest/gtest.h>
 #include <thread>
 #include <vector>
-#include <atomic>
 
 // ==================== MPSC Queue 测试 ====================
 
 class MpscQueueTest : public ::testing::Test {
-protected:
-    void SetUp() override
-    {
-        ASSERT_EQ(0, SilogMpscQueueInit(&queue, sizeof(TestItem), 1024));
-    }
+  protected:
+    void SetUp() override { ASSERT_EQ(0, SilogMpscQueueInit(&queue, sizeof(TestItem), 1024)); }
 
     void TearDown() override { SilogMpscQueueDestroy(&queue); }
 
@@ -95,7 +92,7 @@ TEST_F(MpscQueueTest, MultiThread)
         }
     }
 
-    for (auto& t : producers) {
+    for (auto &t : producers) {
         t.join();
     }
 

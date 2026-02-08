@@ -2,8 +2,8 @@
 
 #include <stdint.h>
 
-int32_t SilogDaemonClientInit()
+int32_t SilogDaemonClientInit(void)
 {
-    // 客户端初始化逻辑
+    /* 客户端初始化逻辑 */
     return 0;
 }

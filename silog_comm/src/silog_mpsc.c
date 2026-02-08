@@ -62,8 +62,8 @@ int32_t SilogMpscQueuePush(SiLogMpscQueue *logQueue, const void *element)
     }
 
     int32_t index = write & (logQueue->capacity - 1);
-    (void)memcpy_s(logQueue->buffer + index * logQueue->elementSize,
-                   logQueue->elementSize, element, logQueue->elementSize);
+    (void)memcpy_s(logQueue->buffer + index * logQueue->elementSize, logQueue->elementSize, element,
+                   logQueue->elementSize);
 
     return SILOG_OK;
 }
@@ -81,8 +81,7 @@ int32_t SilogMpscQueuePop(SiLogMpscQueue *logQueue, void *outElement)
     }
 
     uint32_t index = read & (logQueue->capacity - 1);
-    (void)memcpy_s(outElement, logQueue->elementSize,
-                   (char *)logQueue->buffer + index * logQueue->elementSize,
+    (void)memcpy_s(outElement, logQueue->elementSize, (char *)logQueue->buffer + index * logQueue->elementSize,
                    logQueue->elementSize);
 
     atomic_store(&logQueue->readPos, read + 1);

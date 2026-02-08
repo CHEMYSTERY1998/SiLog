@@ -1,7 +1,7 @@
 #include "silog_time.h"
 
-#include <gtest/gtest.h>
 #include <cstring>
+#include <gtest/gtest.h>
 
 // ==================== Time 工具测试 ====================
 

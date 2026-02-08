@@ -37,7 +37,7 @@ STATIC void setNonblock(int32_t fd)
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
 
-STATIC int32_t SilogTransUdpClientInit()
+STATIC int32_t SilogTransUdpClientInit(void)
 {
     g_silogTranAgent.sendFd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (g_silogTranAgent.sendFd < 0) {
@@ -76,7 +76,7 @@ STATIC int32_t SilogTransUdpClientSend(const void *data, uint32_t len)
     return SILOG_OK;
 }
 
-STATIC void SilogTransUdpClientClose()
+STATIC void SilogTransUdpClientClose(void)
 {
     if (g_silogTranAgent.sendFd >= 0) {
         close(g_silogTranAgent.sendFd);
@@ -84,9 +84,9 @@ STATIC void SilogTransUdpClientClose()
     }
 }
 
-STATIC int32_t SilogTransUdpServerInit()
+STATIC int32_t SilogTransUdpServerInit(void)
 {
-    unlink(LOGD_SOCKET_PATH); // 删除旧文件
+    unlink(LOGD_SOCKET_PATH); /* 删除旧文件 */
     g_silogTranAgent.recvFd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (g_silogTranAgent.recvFd < 0) {
         return SILOG_NET_FILE_CREATE;
@@ -118,7 +118,7 @@ STATIC int32_t SilogTransUdpServerRecv(void *data, uint32_t len)
     return recv(g_silogTranAgent.recvFd, data, len, 0);
 }
 
-STATIC void SilogTransUdpServerClose()
+STATIC void SilogTransUdpServerClose(void)
 {
     if (g_silogTranAgent.recvFd >= 0) {
         close(g_silogTranAgent.recvFd);
@@ -129,14 +129,14 @@ STATIC void SilogTransUdpServerClose()
 // =========== TCP 传输实现 ===========
 // TODO: 后续实现 TCP 传输相关函数
 
-STATIC void SilogTransTypeSetTcp()
+STATIC void SilogTransTypeSetTcp(void)
 {
     g_silogTranAgent.clientInit = NULL;
     g_silogTranAgent.clientSend = NULL;
     g_silogTranAgent.clientClose = NULL;
 }
 
-STATIC void SilogTransTypeSetUdp()
+STATIC void SilogTransTypeSetUdp(void)
 {
     g_silogTranAgent.clientInit = SilogTransUdpClientInit;
     g_silogTranAgent.clientSend = SilogTransUdpClientSend;
@@ -146,7 +146,7 @@ STATIC void SilogTransTypeSetUdp()
     g_silogTranAgent.serverClose = SilogTransUdpServerClose;
 }
 
-int32_t SilogTransClientInit()
+int32_t SilogTransClientInit(void)
 {
     if (g_silogTranAgent.clientInit == NULL) {
         return SILOG_NOT_IMPLEMENTED;
@@ -162,7 +162,7 @@ int32_t SilogTransClientSend(const void *data, uint32_t len)
     return g_silogTranAgent.clientSend(data, len);
 }
 
-void SilogTransClientClose()
+void SilogTransClientClose(void)
 {
     if (g_silogTranAgent.clientClose == NULL) {
         return;
@@ -170,7 +170,7 @@ void SilogTransClientClose()
     g_silogTranAgent.clientClose();
 }
 
-int32_t SilogTransServerInit()
+int32_t SilogTransServerInit(void)
 {
     if (g_silogTranAgent.serverInit == NULL) {
         return SILOG_NOT_IMPLEMENTED;
@@ -186,7 +186,7 @@ int32_t SilogTransServerRecv(void *data, uint32_t len)
     return g_silogTranAgent.serverRecv(data, len);
 }
 
-void SilogTransServerClose()
+void SilogTransServerClose(void)
 {
     if (g_silogTranAgent.serverClose == NULL) {
         return;
@@ -194,12 +194,12 @@ void SilogTransServerClose()
     g_silogTranAgent.serverClose();
 }
 
-void SilogTransInit(TransType type)
+void SilogTransInit(SilogTransType_t type)
 {
     if (g_silogTranAgent.isInit) {
         return;
     }
-    if (type == TRAN_TYPE_UDP) {
+    if (type == SILOG_TRAN_TYPE_UDP) {
         SilogTransTypeSetUdp();
     } else {
         SilogTransTypeSetTcp();

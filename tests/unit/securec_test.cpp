@@ -1,19 +1,19 @@
 #include "silog_securec.h"
 
-#include <gtest/gtest.h>
 #include <cstring>
+#include <gtest/gtest.h>
 #include <string>
 
 // ==================== 内存操作函数测试 ====================
 
 TEST(SecurecTest, MemsetS_Basic)
 {
-    char buffer[16] = {0};  // 初始化为 0
+    char buffer[16] = {0}; // 初始化为 0
     errno_t ret = memset_s(buffer, sizeof(buffer), 'A', 5);
     EXPECT_EQ(ret, EOK);
     EXPECT_EQ(buffer[0], 'A');
     EXPECT_EQ(buffer[4], 'A');
-    EXPECT_EQ(buffer[5], 0);  // 未设置的部分保持原值（0）
+    EXPECT_EQ(buffer[5], 0); // 未设置的部分保持原值（0）
 }
 
 TEST(SecurecTest, MemsetS_NullDest)
@@ -249,7 +249,7 @@ TEST(SecurecTest, SnprintfS_Truncate)
     char dest[16];
     int ret = snprintf_s(dest, sizeof(dest), 5, "Hello World");
     EXPECT_GT(ret, 0);
-    EXPECT_EQ(std::string(dest).length(), 5);  // 截断到 5 个字符
+    EXPECT_EQ(std::string(dest).length(), 5); // 截断到 5 个字符
 }
 
 // ==================== 格式化输入函数测试 ====================

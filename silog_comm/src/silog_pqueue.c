@@ -6,8 +6,7 @@
 #include <string.h>
 
 // 初始化优先队列
-int32_t SilogPQueueInit(SiLogPQueue *queue, uint32_t elementSize, uint32_t capacity,
-                        SiLogPQueueCompareFunc compare)
+int32_t SilogPQueueInit(SiLogPQueue *queue, uint32_t elementSize, uint32_t capacity, SiLogPQueueCompareFunc compare)
 {
     if (queue == NULL || elementSize == 0 || capacity == 0 || compare == NULL) {
         return SILOG_INVALID_ARG;
@@ -76,26 +75,30 @@ STATIC void SiftUp(SiLogPQueue *queue, uint32_t index)
     uint32_t elementSize = queue->elementSize;
     SiLogPQueueCompareFunc compare = queue->compare;
 
-    // 临时保存当前元素
-    uint8_t temp[elementSize];
-    (void)memcpy_s(temp, sizeof(temp), buffer + index * elementSize, elementSize);
+    /* 临时保存当前元素 */
+    uint8_t *temp = (uint8_t *)SiMalloc(elementSize);
+    if (temp == NULL) {
+        return;
+    }
+    (void)memcpy_s(temp, elementSize, buffer + index * elementSize, elementSize);
 
     while (index > 0) {
-        uint32_t parent = (index - 1) / 2;
+        uint32_t parent = (index - 1) / 2; /* 父节点索引 */
         void *parentElem = buffer + parent * elementSize;
 
-        // 如果当前元素不比父元素优先，停止
+        /* 如果当前元素不比父元素优先，停止 */
         if (compare(temp, parentElem) <= 0) {
             break;
         }
 
-        // 父元素下移
+        /* 父元素下移 */
         (void)memcpy_s(buffer + index * elementSize, elementSize, parentElem, elementSize);
         index = parent;
     }
 
-    // 将当前元素放到最终位置
+    /* 将当前元素放到最终位置 */
     (void)memcpy_s(buffer + index * elementSize, elementSize, temp, elementSize);
+    SiFree(temp);
 }
 
 // 向下调整堆
@@ -106,13 +109,16 @@ STATIC void SiftDown(SiLogPQueue *queue, uint32_t index)
     SiLogPQueueCompareFunc compare = queue->compare;
     uint32_t size = queue->size;
 
-    // 临时保存当前元素
-    uint8_t temp[elementSize];
-    (void)memcpy_s(temp, sizeof(temp), buffer + index * elementSize, elementSize);
+    /* 临时保存当前元素 */
+    uint8_t *temp = (uint8_t *)SiMalloc(elementSize);
+    if (temp == NULL) {
+        return;
+    }
+    (void)memcpy_s(temp, elementSize, buffer + index * elementSize, elementSize);
 
     while (1) {
-        uint32_t left = 2 * index + 1;
-        uint32_t right = 2 * index + 2;
+        uint32_t left = 2 * index + 1;  /* 左子节点索引 */
+        uint32_t right = 2 * index + 2; /* 右子节点索引 */
         uint32_t largest = index;
 
         if (left < size) {
@@ -135,14 +141,14 @@ STATIC void SiftDown(SiLogPQueue *queue, uint32_t index)
             break;
         }
 
-        // 交换
-        (void)memcpy_s(buffer + index * elementSize, elementSize,
-                       buffer + largest * elementSize, elementSize);
+        /* 交换 */
+        (void)memcpy_s(buffer + index * elementSize, elementSize, buffer + largest * elementSize, elementSize);
         index = largest;
     }
 
-    // 将当前元素放到最终位置
+    /* 将当前元素放到最终位置 */
     (void)memcpy_s(buffer + index * elementSize, elementSize, temp, elementSize);
+    SiFree(temp);
 }
 
 // 插入元素
@@ -153,12 +159,11 @@ int32_t SilogPQueuePush(SiLogPQueue *queue, const void *element)
     }
 
     if (queue->size >= queue->capacity) {
-        return SILOG_BUSY;  // 队列已满
+        return SILOG_BUSY; // 队列已满
     }
 
     // 将新元素放到数组末尾
-    (void)memcpy_s(queue->buffer + queue->size * queue->elementSize,
-                   queue->elementSize, element, queue->elementSize);
+    (void)memcpy_s(queue->buffer + queue->size * queue->elementSize, queue->elementSize, element, queue->elementSize);
     queue->size++;
 
     // 向上调整
@@ -185,8 +190,7 @@ int32_t SilogPQueuePop(SiLogPQueue *queue, void *outElement)
 
     if (queue->size > 0) {
         // 将最后一个元素移到堆顶
-        (void)memcpy_s(queue->buffer, queue->elementSize,
-                       queue->buffer + queue->size * queue->elementSize,
+        (void)memcpy_s(queue->buffer, queue->elementSize, queue->buffer + queue->size * queue->elementSize,
                        queue->elementSize);
         // 向下调整
         SiftDown(queue, 0);

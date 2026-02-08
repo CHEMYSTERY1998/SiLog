@@ -2,15 +2,15 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "silog_logger.h"
 #include "silog_error.h"
+#include "silog_logger.h"
 #include "silog_trans.h"
 
 void *SilogTransServerTestInit(void *arg)
 {
     (void)arg;
     printf("server thread started\n");
-    SilogTransInit(TRAN_TYPE_UDP);
+    SilogTransInit(SILOG_TRAN_TYPE_UDP);
     int ret = SilogTransServerInit();
     if (ret != SILOG_OK) {
         printf("SilogTransServerInit failed: %d\n", ret);

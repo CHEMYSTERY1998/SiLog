@@ -1,13 +1,13 @@
+#include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <errno.h>
 
 #include "silog_mpsc.h" // 你的头文件
 
-#define PRODUCER_COUNT 3
+#define PRODUCER_COUNT  3
 #define PER_THREAD_PUSH 1000
 
 typedef struct {
