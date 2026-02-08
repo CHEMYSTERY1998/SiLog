@@ -1,7 +1,6 @@
 #ifndef SILOG_MPSC_H
 #define SILOG_MPSC_H
 
-#include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -9,7 +8,11 @@
 #include <string.h>
 
 #ifdef __cplusplus
+#include <atomic>
+using atomic_uint = std::atomic_uint;
 extern "C" {
+#else
+#include <stdatomic.h>
 #endif
 
 typedef struct {
