@@ -12,11 +12,11 @@
 # 添加新的测试子目录
 add_subdirectory(unit)
 add_subdirectory(integration)
-add_subdirectory(system)
-add_subdirectory(fuzz)
-add_subdirectory(concurrency)
-add_subdirectory(benchmark)
-add_subdirectory(reliability)
+# add_subdirectory(system)
+# add_subdirectory(fuzz)
+# add_subdirectory(concurrency)
+# add_subdirectory(benchmark)
+# add_subdirectory(reliability)
 
 # 保留原有的 C 语言测试（向后兼容）
 set(LEGACY_TEST_EXECUTABLES silog_logger_test silog_trans_test

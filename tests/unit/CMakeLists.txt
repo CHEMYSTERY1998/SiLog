@@ -9,6 +9,7 @@ add_executable(silog_unittest
     pqueue_test.cpp
     time_test.cpp
     securec_test.cpp
+    trans_test.cpp
 )
 
 target_include_directories(silog_unittest
