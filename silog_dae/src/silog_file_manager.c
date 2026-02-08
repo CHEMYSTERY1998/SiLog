@@ -92,7 +92,8 @@ static SilogFileManager g_fileManager = {
 // 获取当前日志文件完整路径
 STATIC void GetCurrentLogFilePath(char *path, size_t len)
 {
-    int ret = snprintf_s(path, len, len - 1, "%s/%s.log", g_fileManager.config.logDir, g_fileManager.config.logFileBase);
+    int ret =
+        snprintf_s(path, len, len - 1, "%s/%s.log", g_fileManager.config.logDir, g_fileManager.config.logFileBase);
     if (ret < 0) {
         path[0] = '\0';
     }
@@ -183,8 +184,8 @@ STATIC int32_t CleanOldFiles(void)
         }
         struct stat st;
         FileInfo info = {.mtime = 0};
-        int ret = snprintf_s(info.path, sizeof(info.path), sizeof(info.path) - 1, "%s/%s",
-                             g_fileManager.config.logDir, name);
+        int ret =
+            snprintf_s(info.path, sizeof(info.path), sizeof(info.path) - 1, "%s/%s", g_fileManager.config.logDir, name);
         if (ret < 0) {
             info.path[0] = '\0';
             continue;

@@ -1,50 +1,64 @@
 ---
-Language: Cpp
-BasedOnStyle: LLVM
-IndentWidth: 4
-UseTab: Never
-AllowShortFunctionsOnASingleLine: Inline
-ColumnLimit: 120
+# ==============================================================================
+# SiLog 项目 clang-format 配置文件
+# ==============================================================================
 
-# ✅ 换行：始终为块应用新行设置
-BreakBeforeBraces: Custom
-# BraceWrapping 配置项，用于控制代码中大括号的换行行为
+# 基础设置
+Language: Cpp                    # C/C++ 代码
+BasedOnStyle: LLVM               # 基于 LLVM 风格
+IndentWidth: 4                   # 缩进宽度为 4 个空格
+UseTab: Never                    # 使用空格而非 Tab
+ColumnLimit: 120                 # 每行最大 120 字符
+
+# ==============================================================================
+# 大括号换行风格
+# ==============================================================================
+BreakBeforeBraces: Custom        # 使用自定义大括号风格
 BraceWrapping:
-  AfterControlStatement: false           # 控制块：同一行，前加空格
-  AfterFunction: true                    # 函数：换行
-  AfterNamespace: false                  # 命名空间：同一行，前加空格
-  AfterClass: false                      # 类型（class/struct）：同一行，前加空格
-  AfterLambda: false                     # lambda：同一行，前加空格
-  AfterExternBlock: false                # extern 块：同一行
-  AfterStruct: false                     # 结构体：同一行
-  AfterUnion: false                      # 联合体：同一行
-  BeforeCatch: false                     # catch 关键字前不换行
-  BeforeElse: false                      # else 关键字前不换行
-  AfterEnum: false                       # 枚举：同一行
-  AfterObjCDeclaration: false            # ObjectiveC 声明：同一行
-  AfterCaseLabel: false                  # case 标签：同一行
-  AfterConstructorInitializer: false     # 构造函数初始化列表：同一行
-  AfterIf: false                         # if 语句：同一行
-  AfterWhile: false                      # while 语句：同一行
-  AfterFor: false                        # for 语句：同一行
-  AfterSwitch: false                     # switch 语句：同一行
-  AfterTry: false                        # try 语句：同一行
-  AfterDo: false                         # do 语句：同一行
-  AfterBlock: true                       # 作用域块：换行
+  AfterFunction: true            # 函数左大括号换行
+  AfterControlStatement: false   # 控制语句(if/while/for)左大括号不换行
+  AfterNamespace: false          # namespace 左大括号不换行
+  AfterClass: false              # class 左大括号不换行
+  AfterStruct: false             # struct 左大括号不换行
+  AfterUnion: false              # union 左大括号不换行
+  AfterExternBlock: false        # extern 块左大括号不换行
+  BeforeCatch: false             # catch 前不换行
+  BeforeElse: false              # else 前不换行
+  SplitEmptyFunction: false      # 空函数不拆分
+  SplitEmptyRecord: false        # 空结构体/类不拆分
+  SplitEmptyNamespace: false     # 空 namespace 不拆分
 
-# ✅ 缩进：圆括号内部输入新行时对齐左括号
-AlignAfterOpenBracket: Align  # 括号内换行时不要对齐到第一个参数
-ContinuationIndentWidth: 4        # 换行缩进宽度（相对于上一行）
+# ==============================================================================
+# 函数和表达式风格
+# ==============================================================================
+AllowShortFunctionsOnASingleLine: Inline  # 只允许内联函数单行
+AllowShortEnumsOnASingleLine: false       # 枚举不强制单行
+AlignAfterOpenBracket: Align              # 括号内参数对齐左括号
+ContinuationIndentWidth: 4                # 续行缩进宽度
 
-# ✅ 新行关键字位置：全部不选（保持默认）
-BreakBeforeBinaryOperators: None                  # 二元操作符前的换行规则设置为无特殊要求
-BreakBeforeTernaryOperators: false                # 三元操作符前不换行
-AlwaysBreakAfterReturnType: None                  # 返回类型后的换行规则设置为无特殊要求
-AlwaysBreakBeforeMultilineStrings: false          # 多行字符串前不强制换行
-AlwaysBreakTemplateDeclarations: false            # 模板声明前不强制换行
-BreakConstructorInitializers: BeforeComma         # 构造函数初始化列表在逗号前换行
-AllowShortEnumsOnASingleLine: false               # 不允许枚举在单行内定义
+# ==============================================================================
+# 操作符和表达式换行
+# ==============================================================================
+BreakBeforeBinaryOperators: None          # 二元操作符前不强制换行
+BreakBeforeTernaryOperators: false        # 三元操作符前不换行
+AlwaysBreakAfterReturnType: None          # 返回类型后不强制换行
+AlwaysBreakBeforeMultilineStrings: false  # 多行字符串前不强制换行
+BreakConstructorInitializers: BeforeComma # 构造函数初始化列表在逗号前换行
 
-# ✅ 宏对齐
-AlignConsecutiveMacros: true                       # 对齐连续的宏定义（反斜杠对齐）
-AlignEscapedNewlines: Left                         # 宏定义换行时反斜杠左对齐
+# ==============================================================================
+# 对齐和排序
+# ==============================================================================
+AlignConsecutiveMacros: true      # 对齐连续的宏定义（反斜杠对齐）
+AlignEscapedNewlines: Left        # 宏定义换行时反斜杠左对齐
+PointerAlignment: Right           # 指针星号靠右 (int *a)
+SortIncludes: true                # 排序 #include 语句
+
+# ==============================================================================
+# 注释说明
+# ==============================================================================
+# 此配置遵循项目代码规范：
+# - 函数定义的大括号换行
+# - 控制语句的大括号不换行
+# - 使用 4 空格缩进
+# - 指针类型写作 int *a 而非 int* a
+# ==============================================================================

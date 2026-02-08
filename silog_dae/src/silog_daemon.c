@@ -132,10 +132,9 @@ STATIC void *SilogDaemonWriteThreadFunc(void *arg)
         if (ret == SILOG_OK) {
             // 格式化日志
             SilogFormatWallClockMs(entry.ts, timebuf, sizeof(timebuf));
-            int len = snprintf_s(logbuf, sizeof(logbuf), sizeof(logbuf) - 1,
-                                "[%s][%s][pid:%d tid:%d][%s][%s:%u] %s\n", timebuf,
-                                SilogLevelToName(entry.level), entry.pid, entry.tid, entry.tag, entry.file, entry.line,
-                                entry.msg);
+            int len = snprintf_s(logbuf, sizeof(logbuf), sizeof(logbuf) - 1, "[%s][%s][pid:%d tid:%d][%s][%s:%u] %s\n",
+                                 timebuf, SilogLevelToName(entry.level), entry.pid, entry.tid, entry.tag, entry.file,
+                                 entry.line, entry.msg);
             if (len < 0) {
                 SILOG_DAEMON_E("snprintf_s failed");
                 continue;
