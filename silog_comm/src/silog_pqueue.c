@@ -1,6 +1,7 @@
 #include "silog_pqueue.h"
 #include "silog_adapter.h"
 #include "silog_error.h"
+#include "silog_securec.h"
 
 #include <string.h>
 
@@ -77,7 +78,7 @@ STATIC void SiftUp(SiLogPQueue *queue, uint32_t index)
 
     // 临时保存当前元素
     uint8_t temp[elementSize];
-    memcpy(temp, buffer + index * elementSize, elementSize);
+    (void)memcpy_s(temp, sizeof(temp), buffer + index * elementSize, elementSize);
 
     while (index > 0) {
         uint32_t parent = (index - 1) / 2;
@@ -89,12 +90,12 @@ STATIC void SiftUp(SiLogPQueue *queue, uint32_t index)
         }
 
         // 父元素下移
-        memcpy(buffer + index * elementSize, parentElem, elementSize);
+        (void)memcpy_s(buffer + index * elementSize, elementSize, parentElem, elementSize);
         index = parent;
     }
 
     // 将当前元素放到最终位置
-    memcpy(buffer + index * elementSize, temp, elementSize);
+    (void)memcpy_s(buffer + index * elementSize, elementSize, temp, elementSize);
 }
 
 // 向下调整堆
@@ -107,7 +108,7 @@ STATIC void SiftDown(SiLogPQueue *queue, uint32_t index)
 
     // 临时保存当前元素
     uint8_t temp[elementSize];
-    memcpy(temp, buffer + index * elementSize, elementSize);
+    (void)memcpy_s(temp, sizeof(temp), buffer + index * elementSize, elementSize);
 
     while (1) {
         uint32_t left = 2 * index + 1;
@@ -135,12 +136,13 @@ STATIC void SiftDown(SiLogPQueue *queue, uint32_t index)
         }
 
         // 交换
-        memcpy(buffer + index * elementSize, buffer + largest * elementSize, elementSize);
+        (void)memcpy_s(buffer + index * elementSize, elementSize,
+                       buffer + largest * elementSize, elementSize);
         index = largest;
     }
 
     // 将当前元素放到最终位置
-    memcpy(buffer + index * elementSize, temp, elementSize);
+    (void)memcpy_s(buffer + index * elementSize, elementSize, temp, elementSize);
 }
 
 // 插入元素
@@ -155,7 +157,8 @@ int32_t SilogPQueuePush(SiLogPQueue *queue, const void *element)
     }
 
     // 将新元素放到数组末尾
-    memcpy(queue->buffer + queue->size * queue->elementSize, element, queue->elementSize);
+    (void)memcpy_s(queue->buffer + queue->size * queue->elementSize,
+                   queue->elementSize, element, queue->elementSize);
     queue->size++;
 
     // 向上调整
@@ -176,13 +179,15 @@ int32_t SilogPQueuePop(SiLogPQueue *queue, void *outElement)
     }
 
     // 返回堆顶元素
-    memcpy(outElement, queue->buffer, queue->elementSize);
+    (void)memcpy_s(outElement, queue->elementSize, queue->buffer, queue->elementSize);
 
     queue->size--;
 
     if (queue->size > 0) {
         // 将最后一个元素移到堆顶
-        memcpy(queue->buffer, queue->buffer + queue->size * queue->elementSize, queue->elementSize);
+        (void)memcpy_s(queue->buffer, queue->elementSize,
+                       queue->buffer + queue->size * queue->elementSize,
+                       queue->elementSize);
         // 向下调整
         SiftDown(queue, 0);
     }
@@ -201,7 +206,7 @@ int32_t SilogPQueuePeek(const SiLogPQueue *queue, void *outElement)
         return SILOG_TRANS_QUEUE_EMPTY;
     }
 
-    memcpy(outElement, queue->buffer, queue->elementSize);
+    (void)memcpy_s(outElement, queue->elementSize, queue->buffer, queue->elementSize);
     return SILOG_OK;
 }
 

@@ -12,6 +12,7 @@
 
 #include "silog_adapter.h"
 #include "silog_error.h"
+#include "silog_securec.h"
 
 #define LOGD_SOCKET_PATH "/tmp/logd.sock"
 
@@ -44,7 +45,7 @@ STATIC int32_t SilogTransUdpClientInit()
     }
     setNonblock(g_silogTranAgent.sendFd); // TODO: 是否需要非阻塞？
     struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(addr));
+    (void)memset_s(&addr, sizeof(addr), 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     int32_t ret = snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", LOGD_SOCKET_PATH);
     if (ret < 0) {
@@ -91,7 +92,7 @@ STATIC int32_t SilogTransUdpServerInit()
         return SILOG_NET_FILE_CREATE;
     }
     struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(addr));
+    (void)memset_s(&addr, sizeof(addr), 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     int32_t ret = snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", LOGD_SOCKET_PATH);
     if (ret < 0) {

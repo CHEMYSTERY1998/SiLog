@@ -5,7 +5,8 @@ add_library(
   ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_trans.c
   ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_time.c
   ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_mpsc.c
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_pqueue.c)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_pqueue.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_securec.c)
 
 target_include_directories(silog_common
                            PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)

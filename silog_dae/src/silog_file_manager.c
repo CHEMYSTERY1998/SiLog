@@ -17,6 +17,7 @@
 #include "silog_pqueue.h"
 #include "silog_time.h"
 #include "silog_utils.h"
+#include "silog_securec.h"
 
 // ================ 常量定义 ================
 
@@ -331,7 +332,8 @@ STATIC int32_t SilogFileManagerInitWithConfig(const SilogLogFileConfig *config)
     }
 
     // 复制配置
-    memcpy(&g_fileManager.config, config, sizeof(SilogLogFileConfig));
+    (void)memcpy_s(&g_fileManager.config, sizeof(g_fileManager.config),
+                   config, sizeof(SilogLogFileConfig));
 
     // 确保目录存在
     int32_t ret = EnsureLogDirExists();
@@ -393,7 +395,7 @@ void SilogFileManagerGetDefaultConfig(SilogLogFileConfig *config)
         return;
     }
 
-    memset(config, 0, sizeof(SilogLogFileConfig));
+    (void)memset_s(config, sizeof(*config), 0, sizeof(*config));
 
     snprintf(config->logDir, sizeof(config->logDir), "%s", DEFAULT_LOG_DIR);
     snprintf(config->logFileBase, sizeof(config->logFileBase), "%s", DEFAULT_LOG_FILE_BASE);

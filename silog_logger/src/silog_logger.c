@@ -15,6 +15,7 @@
 #include "silog_time.h"
 #include "silog_trans.h"
 #include "silog_utils.h"
+#include "silog_securec.h"
 
 #define LOG_ENTRY_QUEUE_CAPACITY 1024
 #define LOG_REE_FILE_PATH        "/tmp/silog_logger.txt"
@@ -56,7 +57,7 @@ static inline void silog_logger_log(const char *fmt, ...)
     va_start(ap, fmt);
     vsnprintf(buf + n, sizeof(buf) - n, fmt, ap);
     va_end(ap);
-    strncat(buf, "\n", sizeof(buf) - strlen(buf) - 1);
+    (void)strncat_s(buf, sizeof(buf), "\n", 1);
     pthread_mutex_lock(&g_logEntryMgr.lock);
     /* 2. 输出目标集合 */
 #ifdef SILOG_EXE
@@ -91,7 +92,7 @@ static inline bool silogCheckLevel(silogLevel level)
 STATIC int32_t silogBuildEntry(logEntry_t *entry, silogLevel level, const char *tag, const char *file, uint32_t line,
                                const char *fmt, ...)
 {
-    memset(entry, 0, sizeof(*entry));
+    (void)memset_s(entry, sizeof(*entry), 0, sizeof(*entry));
 
     va_list args;
     va_start(args, fmt);

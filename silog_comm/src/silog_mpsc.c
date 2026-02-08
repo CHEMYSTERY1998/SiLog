@@ -5,6 +5,7 @@
 
 #include "silog_adapter.h"
 #include "silog_error.h"
+#include "silog_securec.h"
 
 int32_t SilogMpscQueueInit(SiLogMpscQueue *logQueue, uint32_t elementSize, uint32_t capacity)
 {
@@ -61,7 +62,8 @@ int32_t SilogMpscQueuePush(SiLogMpscQueue *logQueue, const void *element)
     }
 
     int32_t index = write & (logQueue->capacity - 1);
-    memcpy(logQueue->buffer + index * logQueue->elementSize, element, logQueue->elementSize);
+    (void)memcpy_s(logQueue->buffer + index * logQueue->elementSize,
+                   logQueue->elementSize, element, logQueue->elementSize);
 
     return SILOG_OK;
 }
@@ -79,7 +81,9 @@ int32_t SilogMpscQueuePop(SiLogMpscQueue *logQueue, void *outElement)
     }
 
     uint32_t index = read & (logQueue->capacity - 1);
-    memcpy(outElement, (char *)logQueue->buffer + index * logQueue->elementSize, logQueue->elementSize);
+    (void)memcpy_s(outElement, logQueue->elementSize,
+                   (char *)logQueue->buffer + index * logQueue->elementSize,
+                   logQueue->elementSize);
 
     atomic_store(&logQueue->readPos, read + 1);
     return SILOG_OK;
