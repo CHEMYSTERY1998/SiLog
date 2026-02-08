@@ -1,11 +1,4 @@
 # SiLog 测试模块
-# ====================
-# unittest: 单元测试 - 测试单个函数/类的行为
-# moduletest: 模块测试 - 测试多个模块协作的集成场景
-
-# 添加子目录
-add_subdirectory(unit)
-add_subdirectory(moduletest)
 
 # 保留原有的 C 语言测试（向后兼容）
 set(TEST_EXECUTABLES silog_logger_test silog_trans_test silog_time_test

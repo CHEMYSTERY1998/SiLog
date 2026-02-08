@@ -53,7 +53,11 @@ static inline void silog_logger_log(const char *fmt, ...)
     va_list ap;
     int err = errno;
     /* 1. 生成完整日志 */
-    int n = snprintf(buf, sizeof(buf), "[%s] ", strerror(err));
+    int n = snprintf_s(buf, sizeof(buf), sizeof(buf) - 1, "[%s] ", strerror(err));
+    if (n < 0) {
+        buf[0] = '\0';
+        n = 0;
+    }
     va_start(ap, fmt);
     vsnprintf(buf + n, sizeof(buf) - n, fmt, ap);
     va_end(ap);
@@ -110,12 +114,14 @@ STATIC int32_t silogBuildEntry(logEntry_t *entry, silogLevel level, const char *
     entry->level = level;
     entry->line = line;
 
-    if (snprintf(entry->tag, SILOG_TAG_MAX_LEN, "%s", tag) < 0) {
-        SILOG_LOGGER_E("vsnprintf failed");
+    int ret = snprintf_s(entry->tag, SILOG_TAG_MAX_LEN, SILOG_TAG_MAX_LEN - 1, "%s", tag);
+    if (ret < 0) {
+        SILOG_LOGGER_E("snprintf_s failed");
         return SILOG_STR_ERR;
     }
-    if (snprintf(entry->file, SILOG_FILE_MAX_LEN, "%s", file) < 0) {
-        SILOG_LOGGER_E("vsnprintf failed");
+    ret = snprintf_s(entry->file, SILOG_FILE_MAX_LEN, SILOG_FILE_MAX_LEN - 1, "%s", file);
+    if (ret < 0) {
+        SILOG_LOGGER_E("snprintf_s failed");
         return SILOG_STR_ERR;
     }
 

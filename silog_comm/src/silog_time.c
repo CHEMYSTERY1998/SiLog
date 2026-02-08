@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "silog_adapter.h"
+#include "silog_securec.h"
 
 // ================ 常量定义 ================
 
@@ -101,10 +102,10 @@ void SilogFormatWallClockMs(uint64_t inputMs, char *buffer, uint32_t bufferLen)
     }
 #endif
 
-    int n = snprintf(buffer, bufferLen, "%04d-%02d-%02d %02d:%02d:%02d.%04u", tm_info.tm_year + YEAR_BASE_OFFSET,
-                     tm_info.tm_mon + MONTH_BASE_OFFSET, tm_info.tm_mday, tm_info.tm_hour, tm_info.tm_min,
-                     tm_info.tm_sec, msec);
-    if (n < 0 || (uint32_t)n >= bufferLen) {
+    int n = snprintf_s(buffer, bufferLen, bufferLen - 1, "%04d-%02d-%02d %02d:%02d:%02d.%04u", tm_info.tm_year + YEAR_BASE_OFFSET,
+                       tm_info.tm_mon + MONTH_BASE_OFFSET, tm_info.tm_mday, tm_info.tm_hour, tm_info.tm_min,
+                       tm_info.tm_sec, msec);
+    if (n < 0) {
         buffer[bufferLen - 1] = '\0';
     }
 }

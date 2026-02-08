@@ -92,7 +92,10 @@ static SilogFileManager g_fileManager = {
 // 获取当前日志文件完整路径
 STATIC void GetCurrentLogFilePath(char *path, size_t len)
 {
-    snprintf(path, len, "%s/%s.log", g_fileManager.config.logDir, g_fileManager.config.logFileBase);
+    int ret = snprintf_s(path, len, len - 1, "%s/%s.log", g_fileManager.config.logDir, g_fileManager.config.logFileBase);
+    if (ret < 0) {
+        path[0] = '\0';
+    }
 }
 
 // 确保日志目录存在
@@ -121,7 +124,10 @@ STATIC void FormatTimestampForFilename(uint64_t tsMs, char *buf, size_t len)
     localtime_r(&sec, &tm);
     strftime(buf, len, "%Y%m%d_%H%M%S", &tm);
     // 追加毫秒部分
-    snprintf(buf + strlen(buf), len - strlen(buf), "_%03u", msec);
+    int ret = snprintf_s(buf + strlen(buf), len - strlen(buf), len - strlen(buf) - 1, "_%03u", msec);
+    if (ret < 0) {
+        buf[strlen(buf)] = '\0';
+    }
 }
 
 // 文件信息（用于优先队列）
@@ -152,7 +158,11 @@ STATIC int32_t CleanOldFiles(void)
 
     // 前缀模式
     char prefixPattern[PATTERN_BUF_SIZE];
-    snprintf(prefixPattern, sizeof(prefixPattern), "%s_", g_fileManager.config.logFileBase);
+    int ret = snprintf_s(prefixPattern, sizeof(prefixPattern), sizeof(prefixPattern) - 1, "%s_",
+                         g_fileManager.config.logFileBase);
+    if (ret < 0) {
+        prefixPattern[0] = '\0';
+    }
 
     n = scandir(g_fileManager.config.logDir, &namelist, NULL, NULL);
     if (n < 0) {
@@ -173,7 +183,12 @@ STATIC int32_t CleanOldFiles(void)
         }
         struct stat st;
         FileInfo info = {.mtime = 0};
-        snprintf(info.path, sizeof(info.path), "%s/%s", g_fileManager.config.logDir, name);
+        int ret = snprintf_s(info.path, sizeof(info.path), sizeof(info.path) - 1, "%s/%s",
+                             g_fileManager.config.logDir, name);
+        if (ret < 0) {
+            info.path[0] = '\0';
+            continue;
+        }
         if (stat(info.path, &st) == 0) {
             info.mtime = st.st_mtime;
             SilogPQueuePush(&fileQueue, &info);
@@ -199,9 +214,12 @@ STATIC int32_t CleanOldFiles(void)
 STATIC void DoCompressFile(const char *filePath)
 {
     char cmd[PATH_MAX_LEN + CMD_ARG_BUF_SIZE];
-    snprintf(cmd, sizeof(cmd), "gzip \"%s\" 2>/dev/null", filePath);
+    int ret = snprintf_s(cmd, sizeof(cmd), sizeof(cmd) - 1, "gzip \"%s\" 2>/dev/null", filePath);
+    if (ret < 0) {
+        return;
+    }
 
-    int ret = system(cmd);
+    ret = system(cmd);
     if (ret != 0) {
         // 压缩失败，可能 gzip 不存在，不影响日志继续写入
     }
@@ -242,10 +260,13 @@ STATIC int32_t CompressFile(const char *filePath)
     if (g_fileManager.config.compressMode == SILOG_COMPRESS_ASYNC) {
         // 异步模式：提交任务到队列
         CompressTask task = {0};
-        snprintf(task.filePath, sizeof(task.filePath), "%s", filePath);
+        int ret = snprintf_s(task.filePath, sizeof(task.filePath), sizeof(task.filePath) - 1, "%s", filePath);
+        if (ret < 0) {
+            return SILOG_OK;
+        }
 
-        int32_t ret = SilogMpscQueuePush(&g_fileManager.compressQueue, &task);
-        if (ret != SILOG_OK) {
+        int32_t pushRet = SilogMpscQueuePush(&g_fileManager.compressQueue, &task);
+        if (pushRet != SILOG_OK) {
             // 队列满，压缩失败但不影响日志继续写入
         }
     } else {
@@ -268,12 +289,17 @@ STATIC int32_t RotateInternal(void)
     /* 处理文件名冲突：如果文件已存在，添加序列号 */
     uint32_t seq = 0;
     while (seq < MAX_SEQ_RETRY_COUNT) {
+        int ret;
         if (seq == 0) {
-            snprintf(historyPath, sizeof(historyPath), "%s/%s_%s.log", g_fileManager.config.logDir,
-                     g_fileManager.config.logFileBase, timestamp);
+            ret = snprintf_s(historyPath, sizeof(historyPath), sizeof(historyPath) - 1, "%s/%s_%s.log",
+                             g_fileManager.config.logDir, g_fileManager.config.logFileBase, timestamp);
         } else {
-            snprintf(historyPath, sizeof(historyPath), "%s/%s_%s_%u.log", g_fileManager.config.logDir,
-                     g_fileManager.config.logFileBase, timestamp, seq);
+            ret = snprintf_s(historyPath, sizeof(historyPath), sizeof(historyPath) - 1, "%s/%s_%s_%u.log",
+                             g_fileManager.config.logDir, g_fileManager.config.logFileBase, timestamp, seq);
+        }
+        if (ret < 0) {
+            historyPath[0] = '\0';
+            break;
         }
         struct stat st;
         if (stat(historyPath, &st) != 0) {
@@ -401,8 +427,15 @@ void SilogFileManagerGetDefaultConfig(SilogLogFileConfig *config)
 
     (void)memset_s(config, sizeof(*config), 0, sizeof(*config));
 
-    snprintf(config->logDir, sizeof(config->logDir), "%s", DEFAULT_LOG_DIR);
-    snprintf(config->logFileBase, sizeof(config->logFileBase), "%s", DEFAULT_LOG_FILE_BASE);
+    int ret = snprintf_s(config->logDir, sizeof(config->logDir), sizeof(config->logDir) - 1, "%s", DEFAULT_LOG_DIR);
+    if (ret < 0) {
+        config->logDir[0] = '\0';
+    }
+    ret = snprintf_s(config->logFileBase, sizeof(config->logFileBase), sizeof(config->logFileBase) - 1, "%s",
+                     DEFAULT_LOG_FILE_BASE);
+    if (ret < 0) {
+        config->logFileBase[0] = '\0';
+    }
     config->maxFileSize = DEFAULT_MAX_FILE_SIZE;
     config->maxFileCount = DEFAULT_MAX_FILE_COUNT;
     config->enableCompression = DEFAULT_ENABLE_COMPRESSION;
@@ -466,7 +499,13 @@ int32_t SilogFileManagerSetLogDir(const char *dir)
         return SILOG_BUSY;
     }
 
-    snprintf(g_fileManager.config.logDir, sizeof(g_fileManager.config.logDir), "%s", dir);
+    int ret = snprintf_s(g_fileManager.config.logDir, sizeof(g_fileManager.config.logDir),
+                         sizeof(g_fileManager.config.logDir) - 1, "%s", dir);
+    if (ret < 0) {
+        g_fileManager.config.logDir[0] = '\0';
+        pthread_mutex_unlock(&g_fileManager.lock);
+        return SILOG_STR_ERR;
+    }
 
     pthread_mutex_unlock(&g_fileManager.lock);
     return SILOG_OK;
@@ -485,7 +524,13 @@ int32_t SilogFileManagerSetLogFileBase(const char *base)
         return SILOG_BUSY;
     }
 
-    snprintf(g_fileManager.config.logFileBase, sizeof(g_fileManager.config.logFileBase), "%s", base);
+    int ret = snprintf_s(g_fileManager.config.logFileBase, sizeof(g_fileManager.config.logFileBase),
+                         sizeof(g_fileManager.config.logFileBase) - 1, "%s", base);
+    if (ret < 0) {
+        g_fileManager.config.logFileBase[0] = '\0';
+        pthread_mutex_unlock(&g_fileManager.lock);
+        return SILOG_STR_ERR;
+    }
 
     pthread_mutex_unlock(&g_fileManager.lock);
     return SILOG_OK;

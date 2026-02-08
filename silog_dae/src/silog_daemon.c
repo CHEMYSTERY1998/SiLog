@@ -48,7 +48,11 @@ static inline void silog_daemon_log(const char *fmt, ...)
     va_list ap;
     int err = errno;
     /* 1. 生成完整日志 */
-    int n = snprintf(buf, sizeof(buf), "[%s] ", strerror(err));
+    int n = snprintf_s(buf, sizeof(buf), sizeof(buf) - 1, "[%s] ", strerror(err));
+    if (n < 0) {
+        buf[0] = '\0';
+        n = 0;
+    }
     va_start(ap, fmt);
     vsnprintf(buf + n, sizeof(buf) - n, fmt, ap);
     va_end(ap);
@@ -128,11 +132,12 @@ STATIC void *SilogDaemonWriteThreadFunc(void *arg)
         if (ret == SILOG_OK) {
             // 格式化日志
             SilogFormatWallClockMs(entry.ts, timebuf, sizeof(timebuf));
-            int len = snprintf(logbuf, sizeof(logbuf), "[%s][%s][pid:%d tid:%d][%s][%s:%u] %s\n", timebuf,
-                               SilogLevelToName(entry.level), entry.pid, entry.tid, entry.tag, entry.file, entry.line,
-                               entry.msg);
+            int len = snprintf_s(logbuf, sizeof(logbuf), sizeof(logbuf) - 1,
+                                "[%s][%s][pid:%d tid:%d][%s][%s:%u] %s\n", timebuf,
+                                SilogLevelToName(entry.level), entry.pid, entry.tid, entry.tag, entry.file, entry.line,
+                                entry.msg);
             if (len < 0) {
-                SILOG_DAEMON_E("snprintf failed");
+                SILOG_DAEMON_E("snprintf_s failed");
                 continue;
             }
             if (len > LOG_MSG_BUF_SIZE) {

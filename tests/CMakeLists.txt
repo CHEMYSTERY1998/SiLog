@@ -17,27 +17,4 @@ add_subdirectory(integration)
 # add_subdirectory(concurrency)
 # add_subdirectory(benchmark)
 # add_subdirectory(reliability)
-
-# 保留原有的 C 语言测试（向后兼容）
-set(LEGACY_TEST_EXECUTABLES silog_logger_test silog_trans_test
-                            silog_time_test silog_daemon_test
-                            silog_mpsc_test)
-
-foreach(executable ${LEGACY_TEST_EXECUTABLES})
-  add_executable(${executable} legacy/${executable}.c)
-
-  target_include_directories(
-    ${executable}
-    PRIVATE ${PROJECT_SOURCE_DIR}/interface
-    PRIVATE ${PROJECT_SOURCE_DIR}/silog_logger/include
-    PRIVATE ${PROJECT_SOURCE_DIR}/silog_dae/include
-    PRIVATE ${PROJECT_SOURCE_DIR}/silog_cat/include
-    PRIVATE ${PROJECT_SOURCE_DIR}/silog_comm/include)
-
-  target_link_libraries(
-    ${executable}
-    PRIVATE silog_logger
-    PRIVATE silog_dae
-    PRIVATE silog_cat
-    PRIVATE silog_common)
-endforeach()
+add_subdirectory(legacy)

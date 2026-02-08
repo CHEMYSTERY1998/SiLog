@@ -47,9 +47,9 @@ STATIC int32_t SilogTransUdpClientInit(void)
     struct sockaddr_un addr;
     (void)memset_s(&addr, sizeof(addr), 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    int32_t ret = snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", LOGD_SOCKET_PATH);
+    int32_t ret = snprintf_s(addr.sun_path, sizeof(addr.sun_path), sizeof(addr.sun_path) - 1, "%s", LOGD_SOCKET_PATH);
     if (ret < 0) {
-        close(g_silogTranAgent.recvFd);
+        close(g_silogTranAgent.sendFd);
         return SILOG_STR_ERR;
     }
 
@@ -94,7 +94,7 @@ STATIC int32_t SilogTransUdpServerInit(void)
     struct sockaddr_un addr;
     (void)memset_s(&addr, sizeof(addr), 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    int32_t ret = snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", LOGD_SOCKET_PATH);
+    int32_t ret = snprintf_s(addr.sun_path, sizeof(addr.sun_path), sizeof(addr.sun_path) - 1, "%s", LOGD_SOCKET_PATH);
     if (ret < 0) {
         close(g_silogTranAgent.recvFd);
         return SILOG_STR_ERR;
