@@ -11,11 +11,14 @@ add_executable(silog_integrationtest
 target_include_directories(silog_integrationtest
     PRIVATE ${PROJECT_SOURCE_DIR}/interface
     PRIVATE ${PROJECT_SOURCE_DIR}/silog_comm/include
+    PRIVATE ${PROJECT_SOURCE_DIR}/silog_logger/include
 )
 
 target_link_libraries(silog_integrationtest
     PRIVATE silog_common
+    PRIVATE silog_logger
     PRIVATE gtest_main
+    PRIVATE pthread
 )
 
 include(GoogleTest)

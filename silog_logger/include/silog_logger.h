@@ -27,6 +27,9 @@ typedef struct {
     uint8_t enabled;               // 预测分支快速判断标志
 } logEntry_t;
 
+/* 设置最小日志级别 */
+void silogSetLevel(silogLevel level);
+
 #ifdef __cplusplus
 }
 #endif
