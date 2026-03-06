@@ -5,6 +5,7 @@
 
 #include "silog_adapter.h"
 #include "silog_error.h"
+#include "silog_prelog.h"
 #include "silog_securec.h"
 
 int32_t SilogMpscQueueInit(SiLogMpscQueue *logQueue, uint32_t elementSize, uint32_t capacity)
@@ -19,6 +20,7 @@ int32_t SilogMpscQueueInit(SiLogMpscQueue *logQueue, uint32_t elementSize, uint3
 
     logQueue->buffer = SiMalloc(elementSize * capacity);
     if (!logQueue->buffer) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "MPSC queue memory allocation failed");
         return SILOG_OUT_OF_MEMORY;
     }
 
@@ -49,6 +51,7 @@ int32_t SilogMpscQueuePush(SiLogMpscQueue *logQueue, const void *element)
     }
 
     if (logQueue->buffer == NULL || logQueue->capacity == 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "MPSC queue not initialized");
         return SILOG_TRANS_NOT_INIT;
     }
 

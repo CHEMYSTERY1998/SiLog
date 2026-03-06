@@ -2,8 +2,10 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 #include "silog_adapter.h"
+#include "silog_prelog.h"
 #include "silog_securec.h"
 
 // ================ 常量定义 ================
@@ -44,6 +46,7 @@ uint64_t SilogGetNowMs(void)
 #elif defined(SILOG_LINUX)
     struct timespec ts;
     if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "clock_gettime(CLOCK_REALTIME) failed: %s", strerror(errno));
         return 0;
     }
 
@@ -69,6 +72,7 @@ uint64_t SilogGetMonoMs(void)
 #elif defined(SILOG_LINUX)
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "clock_gettime(CLOCK_MONOTONIC) failed: %s", strerror(errno));
         return 0;
     }
 
@@ -79,6 +83,7 @@ uint64_t SilogGetMonoMs(void)
 void SilogFormatWallClockMs(uint64_t inputMs, char *buffer, uint32_t bufferLen)
 {
     if (!buffer || bufferLen == 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "FormatWallClockMs failed: invalid argument");
         return;
     }
     buffer[0] = '\0';
@@ -86,6 +91,7 @@ void SilogFormatWallClockMs(uint64_t inputMs, char *buffer, uint32_t bufferLen)
     uint64_t sec64 = inputMs / MS_PER_SEC;
     uint32_t msec = (uint32_t)(inputMs % MS_PER_SEC);
     if (sec64 > (uint64_t)INT64_MAX) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "FormatWallClockMs failed: timestamp overflow");
         return;
     }
 
@@ -94,10 +100,12 @@ void SilogFormatWallClockMs(uint64_t inputMs, char *buffer, uint32_t bufferLen)
 
 #if defined(SILOG_WINDOWS)
     if (localtime_s(&tm_info, &sec) != 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "FormatWallClockMs failed: localtime_s error");
         return; /* localtime_s 失败 */
     }
 #else
     if (localtime_r(&sec, &tm_info) == NULL) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "FormatWallClockMs failed: localtime_r error: %s", strerror(errno));
         return; /* localtime_r 失败 */
     }
 #endif

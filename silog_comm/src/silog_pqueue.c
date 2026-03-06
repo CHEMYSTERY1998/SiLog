@@ -1,6 +1,7 @@
 #include "silog_pqueue.h"
 #include "silog_adapter.h"
 #include "silog_error.h"
+#include "silog_prelog.h"
 #include "silog_securec.h"
 
 #include <string.h>
@@ -9,11 +10,13 @@
 int32_t SilogPQueueInit(SiLogPQueue *queue, uint32_t elementSize, uint32_t capacity, SiLogPQueueCompareFunc compare)
 {
     if (queue == NULL || elementSize == 0 || capacity == 0 || compare == NULL) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "PQueueInit failed: invalid argument");
         return SILOG_INVALID_ARG;
     }
 
     queue->buffer = (uint8_t *)SiMalloc(elementSize * capacity);
     if (queue->buffer == NULL) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "PQueueInit failed: out of memory");
         return SILOG_OUT_OF_MEMORY;
     }
 
@@ -78,6 +81,7 @@ STATIC void SiftUp(SiLogPQueue *queue, uint32_t index)
     /* 临时保存当前元素 */
     uint8_t *temp = (uint8_t *)SiMalloc(elementSize);
     if (temp == NULL) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "SiftUp failed: out of memory");
         return;
     }
     (void)memcpy_s(temp, elementSize, buffer + index * elementSize, elementSize);
@@ -112,6 +116,7 @@ STATIC void SiftDown(SiLogPQueue *queue, uint32_t index)
     /* 临时保存当前元素 */
     uint8_t *temp = (uint8_t *)SiMalloc(elementSize);
     if (temp == NULL) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "SiftDown failed: out of memory");
         return;
     }
     (void)memcpy_s(temp, elementSize, buffer + index * elementSize, elementSize);
@@ -155,10 +160,12 @@ STATIC void SiftDown(SiLogPQueue *queue, uint32_t index)
 int32_t SilogPQueuePush(SiLogPQueue *queue, const void *element)
 {
     if (queue == NULL || element == NULL) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "PQueuePush failed: invalid argument");
         return SILOG_INVALID_ARG;
     }
 
     if (queue->size >= queue->capacity) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "PQueuePush failed: queue is full");
         return SILOG_BUSY; // 队列已满
     }
 
@@ -176,10 +183,12 @@ int32_t SilogPQueuePush(SiLogPQueue *queue, const void *element)
 int32_t SilogPQueuePop(SiLogPQueue *queue, void *outElement)
 {
     if (queue == NULL || outElement == NULL) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "PQueuePop failed: invalid argument");
         return SILOG_INVALID_ARG;
     }
 
     if (queue->size == 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "PQueuePop failed: queue is empty");
         return SILOG_TRANS_QUEUE_EMPTY;
     }
 
@@ -203,10 +212,12 @@ int32_t SilogPQueuePop(SiLogPQueue *queue, void *outElement)
 int32_t SilogPQueuePeek(const SiLogPQueue *queue, void *outElement)
 {
     if (queue == NULL || outElement == NULL) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "PQueuePeek failed: invalid argument");
         return SILOG_INVALID_ARG;
     }
 
     if (queue->size == 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "PQueuePeek failed: queue is empty");
         return SILOG_TRANS_QUEUE_EMPTY;
     }
 
@@ -218,11 +229,13 @@ int32_t SilogPQueuePeek(const SiLogPQueue *queue, void *outElement)
 int32_t SilogPQueueReserve(SiLogPQueue *queue, uint32_t newCapacity)
 {
     if (queue == NULL || newCapacity <= queue->capacity) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "PQueueReserve failed: invalid argument");
         return SILOG_INVALID_ARG;
     }
 
     uint8_t *newBuffer = (uint8_t *)realloc(queue->buffer, queue->elementSize * newCapacity);
     if (newBuffer == NULL) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "PQueueReserve failed: out of memory");
         return SILOG_OUT_OF_MEMORY;
     }
 

@@ -6,6 +6,7 @@ enable_testing()
 add_executable(silog_integrationtest
     main.cpp
     silog_logger_print_test.cpp
+    prelog_integration_test.cpp
 )
 
 target_include_directories(silog_integrationtest

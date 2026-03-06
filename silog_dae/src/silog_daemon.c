@@ -12,68 +12,22 @@
 #include "silog_file_manager.h"
 #include "silog_logger.h"
 #include "silog_mpsc.h"
+#include "silog_prelog.h"
 #include "silog_securec.h"
 #include "silog_time.h"
 #include "silog_trans.h"
 #include "silog_utils.h"
 
-#define LOG_DAEMON_FILE_PATH "/tmp/silog_daemon.txt"
-
 #define US_PER_MS                 1000 // 微秒每毫秒
-#define LOG_BUF_SIZE              1024 // 日志缓冲区大小
 #define TIME_BUF_SIZE             32   // 时间字符串缓冲区大小
 #define LOG_MSG_BUF_SIZE          512  // 日志消息缓冲区大小
 #define DAEMON_LOG_QUEUE_CAPACITY 4096 // 守护进程日志队列容量
 
-#define SILOG_DAEMON(...)        silog_daemon_log(__VA_ARGS__)
-#define SILOG_DAEMON_E(fmt, ...) SILOG_DAEMON("[ERROR]" fmt, ##__VA_ARGS__)
-#define SILOG_DAEMON_W(fmt, ...) SILOG_DAEMON("[WARNING]" fmt, ##__VA_ARGS__)
-#define SILOG_DAEMON_I(fmt, ...) SILOG_DAEMON("[INFO]" fmt, ##__VA_ARGS__)
-#define SILOG_DAEMON_D(fmt, ...) SILOG_DAEMON("[DEBUG]" fmt, ##__VA_ARGS__)
-
 typedef struct {
-    FILE *prelogFd;
-    pthread_mutex_t lock;
     SiLogMpscQueue logQueue;
 } SilogDaemonManager;
 
-SilogDaemonManager g_silogDaemonMgr = {
-    .prelogFd = NULL,
-    .lock = PTHREAD_MUTEX_INITIALIZER,
-};
-
-static inline void silog_daemon_log(const char *fmt, ...)
-{
-    char buf[LOG_BUF_SIZE];
-    va_list ap;
-    int err = errno;
-    /* 1. 生成完整日志 */
-    int n = snprintf_s(buf, sizeof(buf), sizeof(buf) - 1, "[%s] ", strerror(err));
-    if (n < 0) {
-        buf[0] = '\0';
-        n = 0;
-    }
-    va_start(ap, fmt);
-    vsnprintf(buf + n, sizeof(buf) - n, fmt, ap);
-    va_end(ap);
-    (void)strncat_s(buf, sizeof(buf), "\n", 1);
-    pthread_mutex_lock(&g_silogDaemonMgr.lock);
-    /* 2. 输出目标集合 */
-#ifdef SILOG_EXE
-    FILE *fds[2] = {stdout, g_silogDaemonMgr.prelogFd};
-    int fdCount = 2;
-#else
-    FILE *fds[1] = {g_silogDaemonMgr.prelogFd ? g_silogDaemonMgr.prelogFd : stdout};
-    int fdCount = 1;
-#endif
-    for (int i = 0; i < fdCount; i++) {
-        if (!fds[i])
-            continue;
-        fputs(buf, fds[i]);
-        fflush(fds[i]);
-    }
-    pthread_mutex_unlock(&g_silogDaemonMgr.lock);
-}
+SilogDaemonManager g_silogDaemonMgr = {0};
 
 /*
     至少需要三个线程，
@@ -87,7 +41,7 @@ STATIC void *SilogDaemonRecvThreadFunc(void *arg)
     (void)arg;
     int32_t ret = SilogTransServerInit();
     if (ret != SILOG_OK) {
-        SILOG_DAEMON_E("SilogTransServerInit failed: %d", ret);
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "SilogTransServerInit failed: %d", ret);
         return NULL;
     }
     ret = SilogMpscQueueInit(&g_silogDaemonMgr.logQueue, sizeof(logEntry_t), DAEMON_LOG_QUEUE_CAPACITY);
@@ -97,7 +51,7 @@ STATIC void *SilogDaemonRecvThreadFunc(void *arg)
         if (n > 0) {
             ret = SilogMpscQueuePush(&g_silogDaemonMgr.logQueue, &entry);
             if (ret != SILOG_OK) {
-                SILOG_DAEMON_E("SilogMpscQueuePush failed: %d", ret);
+                SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "SilogMpscQueuePush failed: %d", ret);
             }
         } else {
             usleep(US_PER_MS);
@@ -136,7 +90,7 @@ STATIC void *SilogDaemonWriteThreadFunc(void *arg)
                                  timebuf, SilogLevelToName(entry.level), entry.pid, entry.tid, entry.tag, entry.file,
                                  entry.line, entry.msg);
             if (len < 0) {
-                SILOG_DAEMON_E("snprintf_s failed");
+                SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "snprintf_s failed");
                 continue;
             }
             if (len > LOG_MSG_BUF_SIZE) {
@@ -164,7 +118,7 @@ STATIC int32_t SilogDaemonWriteThreadInit()
         return SILOG_THREAD_CREATE;
     }
     if (pthread_detach(write_thread) != 0) {
-        SILOG_DAEMON_E("pthread_detach failed");
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "pthread_detach failed");
         return SILOG_THREAD_CREATE;
     }
 
@@ -173,17 +127,19 @@ STATIC int32_t SilogDaemonWriteThreadInit()
 
 int32_t SilogDaemonInit(void)
 {
+    /* 初始化预日志模块 */
+    SilogPrelogConfig_t prelogConfig = {
+        .path = "/tmp/silog_daemon.txt",
+        .minLevel = SILOG_PRELOG_LEVEL_DEBUG,
+        .enableStdout = false,
+    };
+    (void)SilogPrelogInit(&prelogConfig);
+
     /* 初始化日志文件管理器 */
     int32_t ret = SilogFileManagerInit(NULL);
     if (ret != SILOG_OK) {
-        SILOG_DAEMON_E("SilogFileManagerInit failed: %d", ret);
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "SilogFileManagerInit failed: %d", ret);
         return ret;
-    }
-
-    g_silogDaemonMgr.prelogFd = fopen(LOG_DAEMON_FILE_PATH, "w");
-    if (g_silogDaemonMgr.prelogFd == NULL) {
-        perror("fopen " LOG_DAEMON_FILE_PATH " failed");
-        return SILOG_FILE_OPEN;
     }
 
     /* 初始化日志接收线程 */
@@ -195,7 +151,7 @@ int32_t SilogDaemonInit(void)
     /* 初始化日志写入线程 */
     ret = SilogDaemonWriteThreadInit();
     if (ret != SILOG_OK) {
-        SILOG_DAEMON_E("SilogDaemonWriteThreadInit failed: %d", ret);
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "SilogDaemonWriteThreadInit failed: %d", ret);
         return ret;
     }
 
@@ -207,14 +163,8 @@ int32_t SilogDaemonInit(void)
 
 void SilogDaemonDeinit(void)
 {
-    if (g_silogDaemonMgr.prelogFd != NULL) {
-        pthread_mutex_lock(&g_silogDaemonMgr.lock);
-        fflush(g_silogDaemonMgr.prelogFd);
-        fclose(g_silogDaemonMgr.prelogFd);
-        g_silogDaemonMgr.prelogFd = NULL;
-        pthread_mutex_unlock(&g_silogDaemonMgr.lock);
-    }
-    pthread_mutex_destroy(&g_silogDaemonMgr.lock);
+    /* 反初始化预日志模块 */
+    SilogPrelogDeinit();
 
     /* 反初始化日志文件管理器 */
     SilogFileManagerDeinit();

@@ -82,6 +82,12 @@ sequenceDiagram
 
 ## 4. 模块划分
 
+* **silog_comm** - 公共库
+  * **prelog**: 预日志模块，系统初始化前记录日志
+  * **mpsc**: 多生产者单消费者无锁队列
+  * **trans**: 传输层抽象（UDP/TCP/Unix Socket）
+  * **time**: 时间工具
+  * **securec**: 安全字符串操作
 * **libsilog**
   * API 宏：`LOG_INFO`, `LOG_ERROR`, …
   * 封装 `log_write()`，通过 socket 发消息
@@ -224,6 +230,82 @@ void SilogFileManagerSetFlushMode(SilogFlushMode mode);
 
 
 
+
+
+## silog_comm - 公共库
+
+公共库提供以下基础模块，被其他所有模块依赖：
+
+### prelog - 预日志模块
+
+预日志模块用于在日志系统完全初始化前记录日志。
+
+**功能特性：**
+- 四级日志级别：DEBUG/INFO/WARNING/ERROR
+- 模块标识区分不同组件（logger/daemon/cat/exe/comm）
+- 线程安全（互斥锁保护）
+- 可选的 stdout 输出
+
+**API：**
+```c
+int32_t SilogPrelogInit(const SilogPrelogConfig_t *config);
+void SilogPrelogDeinit(void);
+int32_t SilogPrelogWrite(const char *module, SilogPrelogLevel_t level,
+                         const char *fmt, ...);
+```
+
+**预定义模块宏：**
+- `SILOG_PRELOG_LOGGER` - logger 模块
+- `SILOG_PRELOG_DAEMON` - daemon 模块
+- `SILOG_PRELOG_CAT` - cat 模块
+- `SILOG_PRELOG_EXE` - exe 模块
+- `SILOG_PRELOG_COMM` - comm 模块
+
+**日志格式：**
+```
+[errno_str] [module] [LEVEL] message
+```
+
+示例：
+```
+[Success] [logger] [INFO] SiLog socket initialized
+[No such file or directory] [daemon] [ERROR] Failed to open file
+```
+
+**详细文档：** [silog_comm/README_PRELOG.md](silog_comm/README_PRELOG.md)
+
+### mpsc - 多生产者单消费者队列
+
+无锁 MPSC 队列，用于高并发场景下的线程安全数据传递。
+
+```c
+SiLogMpscQueue queue;
+SilogMpscQueueInit(&queue, elementSize, capacity);
+SilogMpscQueuePush(&queue, &data);
+SilogMpscQueuePop(&queue, &outData);
+SilogMpscQueueDestroy(&queue);
+```
+
+### trans - 传输层
+
+抽象传输层，支持 UDP/TCP/Unix Socket 通信。
+
+```c
+SilogTransInit(SILOG_TRAN_TYPE_UDP);
+SilogTransClientSend(&data, len);
+SilogTransServerRecv(&buf, len);
+```
+
+### time - 时间工具
+
+```c
+uint64_t ts = SilogGetNowMs();
+SilogFormatWallClockMs(ts, buf, sizeof(buf));
+```
+
+### securec - 安全字符串操作
+
+安全版本的字符串和内存操作函数，防止缓冲区溢出。
 
 ## 模块依赖关系
 

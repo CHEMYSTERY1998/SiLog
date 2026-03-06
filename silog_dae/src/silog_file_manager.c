@@ -14,6 +14,7 @@
 #include "silog_adapter.h"
 #include "silog_error.h"
 #include "silog_mpsc.h"
+#include "silog_prelog.h"
 #include "silog_pqueue.h"
 #include "silog_securec.h"
 #include "silog_time.h"
@@ -107,10 +108,12 @@ STATIC int32_t EnsureLogDirExists(void)
         if (S_ISDIR(st.st_mode)) {
             return SILOG_OK;
         }
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "Log path exists but is not a directory: %s", g_fileManager.config.logDir);
         return SILOG_FILE_OPEN;
     }
 
     if (mkdir(g_fileManager.config.logDir, 0755) != 0 && errno != EEXIST) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "Failed to create log directory %s: %s", g_fileManager.config.logDir, strerror(errno));
         return SILOG_FILE_OPEN;
     }
     return SILOG_OK;
@@ -167,6 +170,7 @@ STATIC int32_t CleanOldFiles(void)
 
     n = scandir(g_fileManager.config.logDir, &namelist, NULL, NULL);
     if (n < 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "Failed to scan dir %s: %s", g_fileManager.config.logDir, strerror(errno));
         return SILOG_FILE_OPEN;
     }
     // 小根堆，容量足够大以容纳所有文件
@@ -330,15 +334,17 @@ STATIC int32_t RotateInternal(void)
         // 轮转失败，重新打开原文件继续追加写入，避免数据丢失
         g_fileManager.currentFd = fopen(currentPath, "a");
         if (g_fileManager.currentFd == NULL) {
+            SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "Rotate failed and cannot reopen %s: %s", currentPath, strerror(errno));
             return SILOG_FILE_OPEN;
         }
-        fprintf(stderr, "[SiLog] Rotate failed: rename %s -> %s, errno=%d\n", currentPath, historyPath, errno);
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "Rotate failed: rename %s -> %s, errno=%d", currentPath, historyPath, errno);
         return SILOG_FILE_WRITE;
     }
 
     // 轮转成功，重新打开新文件
     g_fileManager.currentFd = fopen(currentPath, "w");
     if (g_fileManager.currentFd == NULL) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "Failed to open new log file after rotate %s: %s", currentPath, strerror(errno));
         return SILOG_FILE_OPEN;
     }
 
@@ -353,6 +359,7 @@ STATIC int32_t RotateInternal(void)
 STATIC int32_t SilogFileManagerInitWithConfig(const SilogLogFileConfig *config)
 {
     if (config == NULL) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "InitWithConfig failed: config is NULL");
         return SILOG_INVALID_ARG;
     }
 
@@ -369,6 +376,7 @@ STATIC int32_t SilogFileManagerInitWithConfig(const SilogLogFileConfig *config)
     // 确保目录存在
     int32_t ret = EnsureLogDirExists();
     if (ret != SILOG_OK) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "Failed to ensure log dir exists: %d", ret);
         pthread_mutex_unlock(&g_fileManager.lock);
         return ret;
     }
@@ -378,6 +386,7 @@ STATIC int32_t SilogFileManagerInitWithConfig(const SilogLogFileConfig *config)
     GetCurrentLogFilePath(currentPath, sizeof(currentPath));
     g_fileManager.currentFd = fopen(currentPath, "a");
     if (g_fileManager.currentFd == NULL) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "Failed to open log file %s: %s", currentPath, strerror(errno));
         pthread_mutex_unlock(&g_fileManager.lock);
         return SILOG_FILE_OPEN;
     }
@@ -393,6 +402,7 @@ STATIC int32_t SilogFileManagerInitWithConfig(const SilogLogFileConfig *config)
     // 初始化压缩队列
     ret = SilogMpscQueueInit(&g_fileManager.compressQueue, sizeof(CompressTask), COMPRESS_QUEUE_SIZE);
     if (ret != SILOG_OK) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "Failed to init compress queue: %d", ret);
         fclose(g_fileManager.currentFd);
         g_fileManager.currentFd = NULL;
         pthread_mutex_unlock(&g_fileManager.lock);
@@ -403,6 +413,7 @@ STATIC int32_t SilogFileManagerInitWithConfig(const SilogLogFileConfig *config)
     g_fileManager.compressThreadRunning = true;
     int pthreadRet = pthread_create(&g_fileManager.compressThread, NULL, CompressThreadFunc, NULL);
     if (pthreadRet != 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "Failed to create compress thread: %s", strerror(pthreadRet));
         SilogMpscQueueDestroy(&g_fileManager.compressQueue);
         fclose(g_fileManager.currentFd);
         g_fileManager.currentFd = NULL;
@@ -423,6 +434,7 @@ STATIC int32_t SilogFileManagerInitWithConfig(const SilogLogFileConfig *config)
 void SilogFileManagerGetDefaultConfig(SilogLogFileConfig *config)
 {
     if (config == NULL) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "GetDefaultConfig failed: config is NULL");
         return;
     }
 
@@ -490,12 +502,14 @@ void SilogFileManagerDeinit(void)
 int32_t SilogFileManagerSetLogDir(const char *dir)
 {
     if (dir == NULL) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "SetLogDir failed: dir is NULL");
         return SILOG_INVALID_ARG;
     }
 
     pthread_mutex_lock(&g_fileManager.lock);
 
     if (g_fileManager.initialized) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "SetLogDir failed: file manager already initialized");
         pthread_mutex_unlock(&g_fileManager.lock);
         return SILOG_BUSY;
     }
@@ -503,6 +517,7 @@ int32_t SilogFileManagerSetLogDir(const char *dir)
     int ret = snprintf_s(g_fileManager.config.logDir, sizeof(g_fileManager.config.logDir),
                          sizeof(g_fileManager.config.logDir) - 1, "%s", dir);
     if (ret < 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "SetLogDir failed: snprintf_s error");
         g_fileManager.config.logDir[0] = '\0';
         pthread_mutex_unlock(&g_fileManager.lock);
         return SILOG_STR_ERR;
@@ -515,12 +530,14 @@ int32_t SilogFileManagerSetLogDir(const char *dir)
 int32_t SilogFileManagerSetLogFileBase(const char *base)
 {
     if (base == NULL) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "SetLogFileBase failed: base is NULL");
         return SILOG_INVALID_ARG;
     }
 
     pthread_mutex_lock(&g_fileManager.lock);
 
     if (g_fileManager.initialized) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "SetLogFileBase failed: file manager already initialized");
         pthread_mutex_unlock(&g_fileManager.lock);
         return SILOG_BUSY;
     }
@@ -528,6 +545,7 @@ int32_t SilogFileManagerSetLogFileBase(const char *base)
     int ret = snprintf_s(g_fileManager.config.logFileBase, sizeof(g_fileManager.config.logFileBase),
                          sizeof(g_fileManager.config.logFileBase) - 1, "%s", base);
     if (ret < 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "SetLogFileBase failed: snprintf_s error");
         g_fileManager.config.logFileBase[0] = '\0';
         pthread_mutex_unlock(&g_fileManager.lock);
         return SILOG_STR_ERR;
@@ -589,6 +607,7 @@ void SilogFileManagerSetAsyncFlushSize(uint32_t size)
 int32_t SilogFileManagerWriteRaw(const uint8_t *data, uint32_t len)
 {
     if (data == NULL || len == 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "WriteRaw failed: invalid argument");
         return SILOG_INVALID_ARG;
     }
 
@@ -611,6 +630,7 @@ int32_t SilogFileManagerWriteRaw(const uint8_t *data, uint32_t len)
     // 写入数据
     size_t written = fwrite(data, BYTE_SIZE, len, g_fileManager.currentFd);
     if (written != len) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "Failed to write log data: %s", strerror(errno));
         pthread_mutex_unlock(&g_fileManager.lock);
         return SILOG_FILE_WRITE;
     }
@@ -677,6 +697,7 @@ uint32_t SilogFileManagerGetCurrentSize(void)
 int32_t SilogFileManagerGetCurrentFilePath(char *path, uint32_t len)
 {
     if (path == NULL || len == 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "GetCurrentFilePath failed: invalid argument");
         return SILOG_INVALID_ARG;
     }
 

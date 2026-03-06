@@ -12,6 +12,7 @@
 
 #include "silog_adapter.h"
 #include "silog_error.h"
+#include "silog_prelog.h"
 #include "silog_securec.h"
 
 #define LOGD_SOCKET_PATH "/tmp/logd.sock"
@@ -41,6 +42,7 @@ STATIC int32_t SilogTransUdpClientInit(void)
 {
     g_silogTranAgent.sendFd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (g_silogTranAgent.sendFd < 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Failed to create client socket: %s", strerror(errno));
         return SILOG_NET_FILE_CREATE;
     }
     setNonblock(g_silogTranAgent.sendFd); // TODO: 是否需要非阻塞？
@@ -49,12 +51,14 @@ STATIC int32_t SilogTransUdpClientInit(void)
     addr.sun_family = AF_UNIX;
     int32_t ret = snprintf_s(addr.sun_path, sizeof(addr.sun_path), sizeof(addr.sun_path) - 1, "%s", LOGD_SOCKET_PATH);
     if (ret < 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Failed to format socket path");
         close(g_silogTranAgent.sendFd);
         return SILOG_STR_ERR;
     }
 
     ret = connect(g_silogTranAgent.sendFd, (struct sockaddr *)&addr, sizeof(addr));
     if (ret < 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Failed to connect to socket %s: %s", LOGD_SOCKET_PATH, strerror(errno));
         close(g_silogTranAgent.sendFd);
         return SILOG_NET_CONNECT;
     }
@@ -65,11 +69,13 @@ STATIC int32_t SilogTransUdpClientInit(void)
 STATIC int32_t SilogTransUdpClientSend(const void *data, uint32_t len)
 {
     if (g_silogTranAgent.sendFd < 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Client send failed: socket not initialized");
         return SILOG_NET_FILE_ERROR;
     }
 
     int32_t n = send(g_silogTranAgent.sendFd, data, len, 0);
     if (n < 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Client send failed: %s", strerror(errno));
         return SILOG_NET_SEND;
     }
 
@@ -89,6 +95,7 @@ STATIC int32_t SilogTransUdpServerInit(void)
     unlink(LOGD_SOCKET_PATH); /* 删除旧文件 */
     g_silogTranAgent.recvFd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (g_silogTranAgent.recvFd < 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Failed to create server socket: %s", strerror(errno));
         return SILOG_NET_FILE_CREATE;
     }
     struct sockaddr_un addr;
@@ -96,12 +103,14 @@ STATIC int32_t SilogTransUdpServerInit(void)
     addr.sun_family = AF_UNIX;
     int32_t ret = snprintf_s(addr.sun_path, sizeof(addr.sun_path), sizeof(addr.sun_path) - 1, "%s", LOGD_SOCKET_PATH);
     if (ret < 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Failed to format server socket path");
         close(g_silogTranAgent.recvFd);
         return SILOG_STR_ERR;
     }
 
     ret = bind(g_silogTranAgent.recvFd, (struct sockaddr *)&addr, sizeof(addr));
     if (ret < 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Failed to bind socket %s: %s", LOGD_SOCKET_PATH, strerror(errno));
         close(g_silogTranAgent.recvFd);
         return SILOG_NET_FILE_OPEN;
     }
@@ -112,10 +121,15 @@ STATIC int32_t SilogTransUdpServerInit(void)
 STATIC int32_t SilogTransUdpServerRecv(void *data, uint32_t len)
 {
     if (g_silogTranAgent.recvFd < 0) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Server recv failed: socket not initialized");
         return 0;
     }
 
-    return recv(g_silogTranAgent.recvFd, data, len, 0);
+    int32_t n = recv(g_silogTranAgent.recvFd, data, len, 0);
+    if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+        SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Server recv failed: %s", strerror(errno));
+    }
+    return n;
 }
 
 STATIC void SilogTransUdpServerClose(void)
