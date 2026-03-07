@@ -11,15 +11,19 @@ add_executable(silog_unittest
     securec_test.cpp
     ipc_test.cpp
     prelog_test.cpp
+    remote_test.cpp
 )
 
 target_include_directories(silog_unittest
     PRIVATE ${PROJECT_SOURCE_DIR}/interface
     PRIVATE ${PROJECT_SOURCE_DIR}/silog_comm/include
+    PRIVATE ${PROJECT_SOURCE_DIR}/silog_dae/include
+    PRIVATE ${PROJECT_SOURCE_DIR}/silog_logger/include
 )
 
 target_link_libraries(silog_unittest
     PRIVATE silog_common
+    PRIVATE silog_dae
     PRIVATE gtest_main
 )
 

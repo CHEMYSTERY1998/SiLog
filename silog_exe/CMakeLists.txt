@@ -7,4 +7,4 @@ target_include_directories(
   PRIVATE ${PROJECT_SOURCE_DIR}/silog_comm/include)
 target_compile_definitions(silog PRIVATE SILOG_EXE)
 
-target_link_libraries(silog PRIVATE silog_common silog_dae silog_cat)
+target_link_libraries(silog PRIVATE silog_common silog_dae)

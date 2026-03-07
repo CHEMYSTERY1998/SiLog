@@ -19,6 +19,5 @@ foreach(executable ${TEST_EXECUTABLES})
     ${executable}
     PRIVATE silog_logger
     PRIVATE silog_dae
-    PRIVATE silog_cat
     PRIVATE silog_common)
 endforeach()

@@ -142,9 +142,6 @@ STATIC void SilogIpcDgramServerClose(void)
     }
 }
 
-// =========== Unix Domain STREAM 实现 ===========
-// TODO: 后续实现 Stream 模式
-
 STATIC void SilogIpcTypeSetStream(void)
 {
     g_silogIpcAgent.clientInit = NULL;
