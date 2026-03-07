@@ -65,7 +65,7 @@ STATIC int32_t silogBuildEntry(logEntry_t *entry, silogLevel level, const char *
 
     entry->ts = SilogGetNowMs();
     entry->pid = getpid();
-    entry->tid = getTid();
+    entry->tid = SilogUtilsGetTid();
     entry->level = level;
     entry->line = line;
 

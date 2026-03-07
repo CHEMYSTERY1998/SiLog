@@ -118,7 +118,7 @@ STATIC void SilogRemoteCloseClientLocked(uint32_t idx)
     pthread_mutex_unlock(&g_silogRemoteMgr.lock);
 }
 
-int32_t SilogRemoteInit(const SilogRemoteConfig *config)
+int32_t SilogRemoteInit(const SilogRemoteConfig_t *config)
 {
     int32_t ret;
 

@@ -44,7 +44,7 @@ class RemoteIntegrationTest : public ::testing::Test {
 
     bool StartServer(uint16_t port, uint32_t maxClients = 10)
     {
-        SilogRemoteConfig config = {
+        SilogRemoteConfig_t config = {
             .listenPort = port,
             .maxClients = maxClients,
             .enableAuth = false,
@@ -360,7 +360,7 @@ TEST_F(RemoteIntegrationTest, LargelogEntry_t)
 TEST_F(RemoteIntegrationTest, InvalidPort)
 {
     // 端口 0 应该使用默认端口
-    SilogRemoteConfig config = {
+    SilogRemoteConfig_t config = {
         .listenPort = 0,
         .maxClients = 10,
         .enableAuth = false,

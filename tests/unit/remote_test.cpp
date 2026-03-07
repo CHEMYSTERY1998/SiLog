@@ -54,7 +54,7 @@ TEST_F(RemoteTest, InitWithDefaultConfig)
 // 测试：使用自定义配置初始化
 TEST_F(RemoteTest, InitWithCustomConfig)
 {
-    SilogRemoteConfig config = {
+    SilogRemoteConfig_t config = {
         .listenPort = TEST_REMOTE_PORT,
         .maxClients = 5,
         .enableAuth = false,
@@ -144,7 +144,7 @@ class RemoteClientTest : public ::testing::Test {
     {
         SilogRemoteDeinit();
 
-        SilogRemoteConfig config = {
+        SilogRemoteConfig_t config = {
             .listenPort = TEST_REMOTE_PORT,
             .maxClients = 5,
             .enableAuth = false,
@@ -342,7 +342,7 @@ TEST_F(RemoteClientTest, MaxClientsReached)
     SilogRemoteDeinit();
 
     // 重新初始化，限制为 2 个客户端
-    SilogRemoteConfig config = {
+    SilogRemoteConfig_t config = {
         .listenPort = TEST_REMOTE_PORT,
         .maxClients = 2,
         .enableAuth = false,

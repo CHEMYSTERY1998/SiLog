@@ -8,12 +8,12 @@
 #include "silog.h"
 #include "silog_adapter.h"
 
-pid_t getTid(void)
+pid_t SilogUtilsGetTid(void)
 {
     return (pid_t)syscall(SYS_gettid);
 }
 
-const char *SilogLevelToName(silogLevel level)
+const char *SilogUtilsLevelToName(silogLevel level)
 {
     static const char *names[] = {
         [SILOG_DEBUG] = "DEBUG", [SILOG_INFO] = "INFO",   [SILOG_WARN] = "WARN",

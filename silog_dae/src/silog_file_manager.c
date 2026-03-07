@@ -91,7 +91,7 @@ static SilogFileManager g_fileManager = {
 // ================ 内部辅助函数 ================
 
 // 获取当前日志文件完整路径
-STATIC void GetCurrentLogFilePath(char *path, size_t len)
+STATIC void SilogFileManagerGetCurrentPath(char *path, size_t len)
 {
     int ret =
         snprintf_s(path, len, len - 1, "%s/%s.log", g_fileManager.config.logDir, g_fileManager.config.logFileBase);
@@ -101,7 +101,7 @@ STATIC void GetCurrentLogFilePath(char *path, size_t len)
 }
 
 // 确保日志目录存在
-STATIC int32_t EnsureLogDirExists(void)
+STATIC int32_t SilogFileManagerEnsureDir(void)
 {
     struct stat st;
     if (stat(g_fileManager.config.logDir, &st) == 0) {
@@ -120,7 +120,7 @@ STATIC int32_t EnsureLogDirExists(void)
 }
 
 // 格式化时间戳为文件名（YYYYMMDD_HHMMSS_mmm）
-STATIC void FormatTimestampForFilename(uint64_t tsMs, char *buf, size_t len)
+STATIC void SilogFileManagerFormatTimestamp(uint64_t tsMs, char *buf, size_t len)
 {
     time_t sec = tsMs / MS_PER_SEC;
     uint32_t msec = tsMs % MS_PER_SEC;
@@ -154,7 +154,7 @@ STATIC int OldestFileCompare(const void *a, const void *b)
 }
 
 // 清理旧文件（使用优先队列找出需要删除的最旧文件）
-STATIC int32_t CleanOldFiles(void)
+STATIC int32_t SilogFileManagerCleanOldFiles(void)
 {
     struct dirent **namelist;
     int n;
@@ -216,7 +216,7 @@ STATIC int32_t CleanOldFiles(void)
 }
 
 // 压缩文件（实际执行压缩）
-STATIC void DoCompressFile(const char *filePath)
+STATIC void SilogFileManagerDoCompress(const char *filePath)
 {
     char cmd[PATH_MAX_LEN + CMD_ARG_BUF_SIZE];
     int ret = snprintf_s(cmd, sizeof(cmd), sizeof(cmd) - 1, "gzip \"%s\" 2>/dev/null", filePath);
@@ -231,7 +231,7 @@ STATIC void DoCompressFile(const char *filePath)
 }
 
 // 压缩线程函数
-STATIC void *CompressThreadFunc(void *arg)
+STATIC void *SilogFileManagerCompressThread(void *arg)
 {
     (void)arg;
 
@@ -239,7 +239,7 @@ STATIC void *CompressThreadFunc(void *arg)
         CompressTask task;
         int32_t ret = SilogMpscQueuePop(&g_fileManager.compressQueue, &task);
         if (ret == SILOG_OK) {
-            DoCompressFile(task.filePath);
+            SilogFileManagerDoCompress(task.filePath);
         } else {
             /* 队列为空，短暂休眠 */
             usleep(COMPRESS_SLEEP_US);
@@ -249,14 +249,14 @@ STATIC void *CompressThreadFunc(void *arg)
     /* 线程退出前处理剩余任务 */
     CompressTask task;
     while (SilogMpscQueuePop(&g_fileManager.compressQueue, &task) == SILOG_OK) {
-        DoCompressFile(task.filePath);
+        SilogFileManagerDoCompress(task.filePath);
     }
 
     return NULL;
 }
 
 // 提交压缩任务到队列或同步执行
-STATIC int32_t CompressFile(const char *filePath)
+STATIC int32_t SilogFileManagerCompressFile(const char *filePath)
 {
     if (!g_fileManager.config.enableCompression) {
         return SILOG_OK;
@@ -276,21 +276,21 @@ STATIC int32_t CompressFile(const char *filePath)
         }
     } else {
         // 同步模式：直接执行压缩
-        DoCompressFile(filePath);
+        SilogFileManagerDoCompress(filePath);
     }
 
     return SILOG_OK;
 }
 
 // 执行轮转
-STATIC int32_t RotateInternal(void)
+STATIC int32_t SilogFileManagerRotateInternal(void)
 {
     char currentPath[PATH_MAX_LEN];
     char historyPath[PATH_MAX_LEN];
     char timestamp[TIME_BUF_SIZE];
 
-    GetCurrentLogFilePath(currentPath, sizeof(currentPath));
-    FormatTimestampForFilename(SilogGetNowMs(), timestamp, sizeof(timestamp));
+    SilogFileManagerGetCurrentPath(currentPath, sizeof(currentPath));
+    SilogFileManagerFormatTimestamp(SilogGetNowMs(), timestamp, sizeof(timestamp));
     /* 处理文件名冲突：如果文件已存在，添加序列号 */
     uint32_t seq = 0;
     while (seq < MAX_SEQ_RETRY_COUNT) {
@@ -350,8 +350,8 @@ STATIC int32_t RotateInternal(void)
 
     g_fileManager.currentSize = 0;
     g_fileManager.asyncBufferSize = 0;
-    CompressFile(historyPath);
-    CleanOldFiles();
+    SilogFileManagerCompressFile(historyPath);
+    SilogFileManagerCleanOldFiles();
     return SILOG_OK;
 }
 
@@ -374,7 +374,7 @@ STATIC int32_t SilogFileManagerInitWithConfig(const SilogLogFileConfig *config)
     (void)memcpy_s(&g_fileManager.config, sizeof(g_fileManager.config), config, sizeof(SilogLogFileConfig));
 
     // 确保目录存在
-    int32_t ret = EnsureLogDirExists();
+    int32_t ret = SilogFileManagerEnsureDir();
     if (ret != SILOG_OK) {
         SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "Failed to ensure log dir exists: %d", ret);
         pthread_mutex_unlock(&g_fileManager.lock);
@@ -383,7 +383,7 @@ STATIC int32_t SilogFileManagerInitWithConfig(const SilogLogFileConfig *config)
 
     // 打开当前日志文件
     char currentPath[PATH_MAX_LEN];
-    GetCurrentLogFilePath(currentPath, sizeof(currentPath));
+    SilogFileManagerGetCurrentPath(currentPath, sizeof(currentPath));
     g_fileManager.currentFd = fopen(currentPath, "a");
     if (g_fileManager.currentFd == NULL) {
         SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "Failed to open log file %s: %s", currentPath, strerror(errno));
@@ -411,7 +411,7 @@ STATIC int32_t SilogFileManagerInitWithConfig(const SilogLogFileConfig *config)
 
     // 启动压缩线程
     g_fileManager.compressThreadRunning = true;
-    int pthreadRet = pthread_create(&g_fileManager.compressThread, NULL, CompressThreadFunc, NULL);
+    int pthreadRet = pthread_create(&g_fileManager.compressThread, NULL, SilogFileManagerCompressThread, NULL);
     if (pthreadRet != 0) {
         SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "Failed to create compress thread: %s", strerror(pthreadRet));
         SilogMpscQueueDestroy(&g_fileManager.compressQueue);
@@ -620,7 +620,7 @@ int32_t SilogFileManagerWriteRaw(const uint8_t *data, uint32_t len)
 
     // 先检查是否需要轮转（如果写入后会超过最大文件大小）
     if (g_fileManager.currentSize + len >= g_fileManager.config.maxFileSize) {
-        int32_t ret = RotateInternal();
+        int32_t ret = SilogFileManagerRotateInternal();
         if (ret != SILOG_OK) {
             pthread_mutex_unlock(&g_fileManager.lock);
             return ret;
@@ -667,7 +667,7 @@ int32_t SilogFileManagerRotate(void)
         return SILOG_FILE_MANAGER_NOT_INIT;
     }
 
-    int32_t ret = RotateInternal();
+    int32_t ret = SilogFileManagerRotateInternal();
 
     pthread_mutex_unlock(&g_fileManager.lock);
     return ret;
@@ -702,7 +702,7 @@ int32_t SilogFileManagerGetCurrentFilePath(char *path, uint32_t len)
     }
 
     pthread_mutex_lock(&g_fileManager.lock);
-    GetCurrentLogFilePath(path, len);
+    SilogFileManagerGetCurrentPath(path, len);
     pthread_mutex_unlock(&g_fileManager.lock);
 
     return SILOG_OK;

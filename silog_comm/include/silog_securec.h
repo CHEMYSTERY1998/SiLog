@@ -46,8 +46,8 @@
  * - vscanf_s
  */
 
-#ifndef SILOG_SECURC_H
-#define SILOG_SECURC_H
+#ifndef SILOG_SECUREC_H
+#define SILOG_SECUREC_H
 
 #include <errno.h>
 #include <stddef.h>
@@ -395,4 +395,4 @@ int vscanf_s(const char *format, va_list argList);
 }
 #endif
 
-#endif /* SILOG_SECURC_H */
+#endif /* SILOG_SECUREC_H */

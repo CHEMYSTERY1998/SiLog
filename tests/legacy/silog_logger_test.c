@@ -24,7 +24,7 @@ void printEntry(const logEntry_t *entry)
     }
     char timebuf[32];
     SilogFormatWallClockMs(entry->ts, timebuf, sizeof(timebuf));
-    printf("[%s][%s][pid:%d tid:%d][%s][%s:%u] %s\n", timebuf, SilogLevelToName(entry->level), entry->pid, entry->tid,
+    printf("[%s][%s][pid:%d tid:%d][%s][%s:%u] %s\n", timebuf, SilogUtilsLevelToName(entry->level), entry->pid, entry->tid,
            entry->tag, entry->file, entry->line, entry->msg);
 }
 

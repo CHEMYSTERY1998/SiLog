@@ -44,7 +44,7 @@ typedef struct {
     uint16_t listenPort; ///< 监听端口
     uint32_t maxClients; ///< 最大客户端数
     bool enableAuth;     ///< 是否启用认证（后续扩展）
-} SilogRemoteConfig;
+} SilogRemoteConfig_t;
 
 /**
  * @brief 远程客户端配置结构
@@ -68,7 +68,7 @@ typedef void (*SilogRemoteLogCallback)(const logEntry_t *entry, void *userData);
  * @param config 配置参数，为 NULL 时使用默认配置
  * @return 成功返回 SILOG_OK，失败返回错误码
  */
-int32_t SilogRemoteInit(const SilogRemoteConfig *config);
+int32_t SilogRemoteInit(const SilogRemoteConfig_t *config);
 
 /**
  * @brief 反初始化远程日志服务
