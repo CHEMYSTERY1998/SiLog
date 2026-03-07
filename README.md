@@ -224,13 +224,250 @@ void SilogFileManagerSetFlushMode(SilogFlushMode mode);
 
 ## silog客户端
 
+silog客户端（`silogcat`）用于通过网络连接到守护进程，实时查看日志输出。
 
+### 命令行参数
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `-s, --server <addr>` | 服务器地址 | `127.0.0.1` |
+| `-p, --port <port>` | 服务器端口 | `9090` |
+| `-t, --tag <tag>` | 过滤标签 | - |
+| `-l, --level <level>` | 最小日志级别 | `DEBUG` |
+| `-c, --color` | 彩色输出 | - |
+| `-h, --help` | 显示帮助 | - |
+
+### 使用示例
+
+```bash
+# 连接到本地守护进程
+./silogcat
+
+# 连接远程服务器
+./silogcat -s 192.168.1.100 -p 9090
+
+# 过滤标签
+./silogcat -t Network
+
+# 只显示 WARN 及以上级别
+./silogcat -l WARN
+
+# 彩色输出
+./silogcat -c
+```
+
+---
 
 ## 编译构建
 
+### 环境要求
 
+- Linux 操作系统（支持 Unix Domain Socket）
+- GCC 编译器（支持 C11）
+- CMake 3.10+
+- pthread 库
 
+### 编译步骤
 
+```bash
+# 进入项目根目录
+cd SiLog
+
+# 创建构建目录
+mkdir -p build && cd build
+
+# 配置 CMake
+cmake ..
+
+# 编译
+make -j4
+
+# 运行测试
+make test
+```
+
+### 编译输出
+
+```
+build/
+├── silog_exe/silog              # 守护进程管理工具
+├── silog_cat/silogcat           # 远程日志查看工具
+├── silog_logger/libsilog_logger.so
+├── silog_dae/libsilog_dae.so
+└── tests/                        # 测试程序
+```
+
+---
+
+## 快速开始
+
+### 1. 启动守护进程
+
+```bash
+# 后台启动守护进程
+./build/silog_exe/silog start -d
+
+# 查看状态
+./build/silog_exe/silog status
+```
+
+### 2. 发送测试日志
+
+```bash
+# 使用 silog 发送测试日志
+./build/silog_exe/silog test
+
+# 或运行测试程序
+./build/tests/legacy/silog_test
+```
+
+### 3. 查看日志文件
+
+```bash
+# 查看本地日志文件
+tail -f /tmp/silog/silog.log
+```
+
+### 4. 远程查看日志（可选）
+
+```bash
+# 在另一个终端启动 silogcat
+./build/silog_cat/silogcat
+```
+
+### 5. 停止守护进程
+
+```bash
+./build/silog_exe/silog stop
+```
+
+---
+
+## API 使用
+
+### C/C++ API
+
+#### 头文件
+
+```c
+#include "silog.h"  // 包含所有日志宏
+```
+
+#### 日志宏
+
+| 宏 | 级别 | 说明 |
+|----|------|------|
+| `SILOG_D(tag, fmt, ...)` | DEBUG | 调试信息 |
+| `SILOG_I(tag, fmt, ...)` | INFO | 普通信息 |
+| `SILOG_W(tag, fmt, ...)` | WARN | 警告信息 |
+| `SILOG_E(tag, fmt, ...)` | ERROR | 错误信息 |
+| `SILOG_F(tag, fmt, ...)` | FATAL | 致命错误 |
+
+#### 使用示例
+
+```c
+#include "silog.h"
+
+#define TAG "MyApplication"
+
+int main(void)
+{
+    SILOG_I(TAG, "Application started");
+    SILOG_D(TAG, "Debug value: %d", 42);
+    SILOG_E(TAG, "Error occurred");
+
+    return 0;
+}
+```
+
+#### 编译链接
+
+```bash
+gcc -o myapp myapp.c -I/path/to/SiLog/interface \
+    -L/path/to/SiLog/build/silog_logger \
+    -lsilog_logger -lpthread
+```
+
+#### 设置日志级别
+
+```c
+#include "silog_logger.h"
+
+// 只记录 WARN 及以上级别
+silogSetLevel(SILOG_WARN);
+```
+
+---
+
+## 配置说明
+
+### 日志文件位置
+
+| 文件 | 说明 |
+|------|------|
+| `/tmp/silog/silog.log` | 主日志文件 |
+| `/tmp/silogd.pid` | 守护进程 PID 文件 |
+| `/tmp/silog_exe.txt` | silog_exe 预日志 |
+| `/tmp/silog_daemon.txt` | 守护进程预日志 |
+
+### 日志文件格式
+
+```
+[2026-03-07 23:48:52.0000][INFO][pid:103131 tid:103131][MyApp][main.c:45] Application started
+```
+
+字段说明：
+- 时间戳 - 年月日 时分秒.毫秒
+- 日志级别 - DEBUG/INFO/WARN/ERROR/FATAL
+- 进程ID/线程ID
+- 标签 - 模块标签
+- 文件名:行号
+- 消息内容
+
+---
+
+## 故障排除
+
+### 守护进程无法启动
+
+```bash
+# 检查是否有残留进程
+ps aux | grep silog
+
+# 检查端口占用
+lsof -i :9090
+
+# 查看预日志
+cat /tmp/silog_exe.txt
+
+# 前台启动查看详细错误
+./silog start
+```
+
+### 无法发送日志
+
+```bash
+# 检查守护进程是否运行
+./silog status
+
+# 检查 IPC socket
+ls -la /tmp/logd.sock
+
+# 查看守护进程预日志
+cat /tmp/silog_daemon.txt
+```
+
+### silogcat 无法连接
+
+```bash
+# 检查守护进程状态
+./silog status
+
+# 检查端口监听
+netstat -tlnp | grep 9090
+```
+
+---
 
 ## silog_comm - 公共库
 
