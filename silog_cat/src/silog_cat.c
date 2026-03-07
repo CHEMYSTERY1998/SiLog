@@ -16,12 +16,11 @@
  * @brief silogcat 配置
  */
 typedef struct {
-    char serverAddr[64]; // 服务器地址
-    uint16_t serverPort; // 服务器端口
-    char filterTag[32];  // 标签过滤
-    silogLevel minLevel; // 最小日志级别
-    bool useColor;       // 彩色输出
-    bool running;        // 运行标志
+    char serverAddr[64];    // 服务器地址
+    uint16_t serverPort;    // 服务器端口
+    char filterTag[32];     // 标签过滤
+    silogLevel minLevel;    // 最小日志级别
+    bool useColor;          // 彩色输出
 } SilogCatConfig;
 
 static SilogCatConfig g_silogCatConfig = {
@@ -30,8 +29,10 @@ static SilogCatConfig g_silogCatConfig = {
     .filterTag = "",
     .minLevel = SILOG_DEBUG,
     .useColor = false,
-    .running = true,
 };
+
+/* 使用 sig_atomic_t 保证信号处理中的原子性 */
+static volatile sig_atomic_t g_running = 1;
 
 /**
  * @brief 日志级别字符映射
@@ -50,11 +51,12 @@ static const char g_levelChars[] = {'D', 'I', 'W', 'E', 'F'};
 
 /**
  * @brief 信号处理函数
+ * @note 保持简单，只设置原子变量，不调用非信号安全函数
  */
 static void SilogCatSignalHandler(int sig)
 {
     (void)sig;
-    g_silogCatConfig.running = false;
+    g_running = 0;
 }
 
 /**
@@ -266,7 +268,7 @@ int main(int argc, char *argv[])
 
     /* 主循环 */
     bool wasConnected = false;
-    while (g_silogCatConfig.running) {
+    while (g_running) {
         /* 尝试连接（如果未连接） */
         if (!SilogRemoteClientIsConnected()) {
             if (wasConnected) {

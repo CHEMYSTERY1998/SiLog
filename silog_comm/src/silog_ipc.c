@@ -32,10 +32,16 @@ typedef struct {
 static SilogIpcAgent g_silogIpcAgent = {0};
 
 // =========== Unix Domain DGRAM 实现 ===========
-STATIC void setNonblock(int32_t fd)
+STATIC int32_t setNonblock(int32_t fd)
 {
     int32_t flags = fcntl(fd, F_GETFL, 0);
-    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    if (flags < 0) {
+        return SILOG_NET_FILE_ERROR;
+    }
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+        return SILOG_NET_FILE_ERROR;
+    }
+    return SILOG_OK;
 }
 
 STATIC int32_t SilogIpcDgramClientInit(void)
@@ -45,12 +51,16 @@ STATIC int32_t SilogIpcDgramClientInit(void)
         SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Failed to create client socket: %s", strerror(errno));
         return SILOG_NET_FILE_CREATE;
     }
-    setNonblock(g_silogIpcAgent.sendFd);
+    int32_t ret = setNonblock(g_silogIpcAgent.sendFd);
+    if (ret != SILOG_OK) {
+        close(g_silogIpcAgent.sendFd);
+        g_silogIpcAgent.sendFd = -1;
+        return ret;
+    }
     struct sockaddr_un addr;
     (void)memset_s(&addr, sizeof(addr), 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    int32_t ret =
-        snprintf_s(addr.sun_path, sizeof(addr.sun_path), sizeof(addr.sun_path) - 1, "%s", LOGD_SOCKET_PATH);
+    ret = snprintf_s(addr.sun_path, sizeof(addr.sun_path), sizeof(addr.sun_path) - 1, "%s", LOGD_SOCKET_PATH);
     if (ret < 0) {
         SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Failed to format socket path");
         close(g_silogIpcAgent.sendFd);
@@ -140,6 +150,8 @@ STATIC void SilogIpcDgramServerClose(void)
         close(g_silogIpcAgent.recvFd);
         g_silogIpcAgent.recvFd = -1;
     }
+    /* 删除套接字文件 */
+    (void)unlink(LOGD_SOCKET_PATH);
 }
 
 STATIC void SilogIpcTypeSetStream(void)

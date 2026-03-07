@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -37,6 +38,7 @@ typedef struct {
     uint32_t maxClients;        ///< 最大客户端数
     SilogRemoteClient *clients; ///< 客户端数组
     uint32_t clientCount;       ///< 当前客户端数量
+    pthread_mutex_t lock;       ///< 保护客户端数组的互斥锁
 } SilogRemoteManager;
 
 static SilogRemoteManager g_silogRemoteMgr = {
@@ -46,6 +48,7 @@ static SilogRemoteManager g_silogRemoteMgr = {
     .maxClients = SILOG_REMOTE_DEFAULT_MAX_CLIENTS,
     .clients = NULL,
     .clientCount = 0,
+    .lock = PTHREAD_MUTEX_INITIALIZER,
 };
 
 /**
@@ -78,7 +81,7 @@ STATIC int32_t SilogRemoteFindFreeSlot(void)
 }
 
 /**
- * @brief 关闭指定客户端连接
+ * @brief 关闭指定客户端连接（调用时必须持有锁）
  */
 STATIC void SilogRemoteCloseClientInternal(uint32_t idx)
 {
@@ -105,8 +108,20 @@ STATIC void SilogRemoteCloseClientInternal(uint32_t idx)
     (void)memset_s(&client->addr, sizeof(client->addr), 0, sizeof(client->addr));
 }
 
+/**
+ * @brief 关闭指定客户端连接（带锁版本，供外部调用）
+ */
+STATIC void SilogRemoteCloseClientLocked(uint32_t idx)
+{
+    pthread_mutex_lock(&g_silogRemoteMgr.lock);
+    SilogRemoteCloseClientInternal(idx);
+    pthread_mutex_unlock(&g_silogRemoteMgr.lock);
+}
+
 int32_t SilogRemoteInit(const SilogRemoteConfig *config)
 {
+    int32_t ret;
+
     if (g_silogRemoteMgr.isInit) {
         SILOG_PRELOG_W(SILOG_PRELOG_DAEMON, "Remote service already initialized");
         return SILOG_OK;
@@ -179,7 +194,14 @@ int32_t SilogRemoteInit(const SilogRemoteConfig *config)
     }
 
     /* 设置为非阻塞模式 */
-    SilogRemoteSetNonblock(g_silogRemoteMgr.listenFd);
+    ret = SilogRemoteSetNonblock(g_silogRemoteMgr.listenFd);
+    if (ret != SILOG_OK) {
+        close(g_silogRemoteMgr.listenFd);
+        g_silogRemoteMgr.listenFd = -1;
+        SiFree(g_silogRemoteMgr.clients);
+        g_silogRemoteMgr.clients = NULL;
+        return ret;
+    }
 
     g_silogRemoteMgr.isInit = true;
     SILOG_PRELOG_I(SILOG_PRELOG_DAEMON, "Remote log service initialized on port %d", g_silogRemoteMgr.listenPort);
@@ -189,7 +211,10 @@ int32_t SilogRemoteInit(const SilogRemoteConfig *config)
 
 void SilogRemoteDeinit(void)
 {
+    pthread_mutex_lock(&g_silogRemoteMgr.lock);
+
     if (!g_silogRemoteMgr.isInit) {
+        pthread_mutex_unlock(&g_silogRemoteMgr.lock);
         return;
     }
 
@@ -213,6 +238,8 @@ void SilogRemoteDeinit(void)
     g_silogRemoteMgr.clientCount = 0;
     g_silogRemoteMgr.isInit = false;
 
+    pthread_mutex_unlock(&g_silogRemoteMgr.lock);
+
     SILOG_PRELOG_I(SILOG_PRELOG_DAEMON, "Remote log service deinitialized");
 }
 
@@ -235,8 +262,11 @@ int32_t SilogRemoteAccept(void)
         return SILOG_NET_FILE_ERROR;
     }
 
+    pthread_mutex_lock(&g_silogRemoteMgr.lock);
+
     /* 查找空闲槽位 */
     if (g_silogRemoteMgr.clientCount >= g_silogRemoteMgr.maxClients) {
+        pthread_mutex_unlock(&g_silogRemoteMgr.lock);
         char addrStr[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &clientAddr.sin_addr, addrStr, sizeof(addrStr));
         SILOG_PRELOG_W(SILOG_PRELOG_DAEMON, "Max clients reached, rejecting connection from %s:%d",
@@ -247,6 +277,7 @@ int32_t SilogRemoteAccept(void)
 
     int32_t slot = SilogRemoteFindFreeSlot();
     if (slot < 0) {
+        pthread_mutex_unlock(&g_silogRemoteMgr.lock);
         char addrStr[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &clientAddr.sin_addr, addrStr, sizeof(addrStr));
         SILOG_PRELOG_W(SILOG_PRELOG_DAEMON, "No free slot for connection from %s:%d",
@@ -256,7 +287,12 @@ int32_t SilogRemoteAccept(void)
     }
 
     /* 设置为非阻塞模式 */
-    SilogRemoteSetNonblock(clientFd);
+    int32_t ret = SilogRemoteSetNonblock(clientFd);
+    if (ret != SILOG_OK) {
+        pthread_mutex_unlock(&g_silogRemoteMgr.lock);
+        close(clientFd);
+        return ret;
+    }
 
     /* 保存客户端信息 */
     SilogRemoteClient *client = &g_silogRemoteMgr.clients[slot];
@@ -264,6 +300,8 @@ int32_t SilogRemoteAccept(void)
     client->addr = clientAddr;
     client->active = true;
     g_silogRemoteMgr.clientCount++;
+
+    pthread_mutex_unlock(&g_silogRemoteMgr.lock);
 
     char addrStr[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &clientAddr.sin_addr, addrStr, sizeof(addrStr));
@@ -377,7 +415,10 @@ int32_t SilogRemoteBroadcast(const logEntry_t *entry, int32_t *sentCount)
         return SILOG_NULL_PTR;
     }
 
+    pthread_mutex_lock(&g_silogRemoteMgr.lock);
+
     if (g_silogRemoteMgr.clientCount == 0) {
+        pthread_mutex_unlock(&g_silogRemoteMgr.lock);
         return SILOG_OK;
     }
 
@@ -387,6 +428,7 @@ int32_t SilogRemoteBroadcast(const logEntry_t *entry, int32_t *sentCount)
     SilogRemoteSerializeEntry(entry, buf, sizeof(buf), &bufLen);
 
     if (bufLen == 0) {
+        pthread_mutex_unlock(&g_silogRemoteMgr.lock);
         return SILOG_INVALID_ARG;
     }
 
@@ -398,19 +440,28 @@ int32_t SilogRemoteBroadcast(const logEntry_t *entry, int32_t *sentCount)
             continue;
         }
 
-        int32_t ret = SilogRemoteSendFull(client->fd, buf, bufLen);
+        /* 先解锁再发送，避免长时间持有锁 */
+        int32_t fd = client->fd;
+        pthread_mutex_unlock(&g_silogRemoteMgr.lock);
+
+        int32_t ret = SilogRemoteSendFull(fd, buf, bufLen);
+
+        pthread_mutex_lock(&g_silogRemoteMgr.lock);
+
         if (ret != SILOG_OK) {
             if (ret == SILOG_NET_TIMEOUT) {
                 /* 发送缓冲区满，跳过此客户端 */
                 continue;
             }
             /* 发送失败，关闭连接 */
-            SILOG_PRELOG_W(SILOG_PRELOG_DAEMON, "Failed to send to client %d: %s", i, strerror(errno));
+            SILOG_PRELOG_W(SILOG_PRELOG_DAEMON, "Failed to send to client %u: %s", i, strerror(errno));
             SilogRemoteCloseClientInternal(i);
         } else {
             actualSentCount++;
         }
     }
+
+    pthread_mutex_unlock(&g_silogRemoteMgr.lock);
 
     if (sentCount != NULL) {
         *sentCount = actualSentCount;
@@ -421,7 +472,10 @@ int32_t SilogRemoteBroadcast(const logEntry_t *entry, int32_t *sentCount)
 
 uint32_t SilogRemoteGetClientCount(void)
 {
-    return g_silogRemoteMgr.isInit ? g_silogRemoteMgr.clientCount : 0;
+    pthread_mutex_lock(&g_silogRemoteMgr.lock);
+    uint32_t count = g_silogRemoteMgr.isInit ? g_silogRemoteMgr.clientCount : 0;
+    pthread_mutex_unlock(&g_silogRemoteMgr.lock);
+    return count;
 }
 
 bool SilogRemoteIsInit(void)
