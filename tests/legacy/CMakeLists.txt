@@ -1,7 +1,7 @@
 # SiLog 测试模块
 
 # 保留原有的 C 语言测试（向后兼容）
-set(TEST_EXECUTABLES silog_logger_test silog_trans_test silog_time_test
+set(TEST_EXECUTABLES silog_logger_test silog_ipc_test silog_time_test
                      silog_daemon_test silog_mpsc_test)
 
 foreach(executable ${TEST_EXECUTABLES})

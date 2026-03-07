@@ -14,7 +14,7 @@
 #include "silog_logger.h"
 #include "silog_test_comm.h"
 #include "silog_time.h"
-#include "silog_trans.h"
+#include "silog_ipc.h"
 #include "silog_utils.h"
 
 void printEntry(const logEntry_t *entry)
@@ -31,21 +31,21 @@ void printEntry(const logEntry_t *entry)
 void *entryHandle(void *arg)
 {
     (void)arg;
-    SilogTransInit(SILOG_TRAN_TYPE_UDP);
-    int ret = SilogTransServerInit();
+    SilogIpcInit(SILOG_IPC_TYPE_UNIX_DGRAM);
+    int ret = SilogIpcServerInit();
     if (ret != SILOG_OK) {
-        PRINTF("SilogTransServerInit failed: %d", ret);
+        PRINTF("SilogIpcServerInit failed: %d", ret);
         return NULL;
     }
-    PRINTF("SilogTransServerInit success");
+    PRINTF("SilogIpcServerInit success");
 
     logEntry_t entry;
     while (1) {
-        if (SilogTransServerRecv(&entry, sizeof(entry)) > 0) {
+        if (SilogIpcServerRecv(&entry, sizeof(entry)) > 0) {
             printEntry(&entry);
         }
     }
-    SilogTransServerClose();
+    SilogIpcServerClose();
     return NULL;
 }
 

@@ -3,23 +3,23 @@
 #include <unistd.h>
 
 #include "silog_error.h"
+#include "silog_ipc.h"
 #include "silog_logger.h"
-#include "silog_trans.h"
 
-void *SilogTransServerTestInit(void *arg)
+void *SilogIpcServerTestInit(void *arg)
 {
     (void)arg;
     printf("server thread started\n");
-    SilogTransInit(SILOG_TRAN_TYPE_UDP);
-    int ret = SilogTransServerInit();
+    SilogIpcInit(SILOG_IPC_TYPE_UNIX_DGRAM);
+    int ret = SilogIpcServerInit();
     if (ret != SILOG_OK) {
-        printf("SilogTransServerInit failed: %d\n", ret);
+        printf("SilogIpcServerInit failed: %d\n", ret);
         return NULL;
     }
-    printf("SilogTransServerInit success\n");
+    printf("SilogIpcServerInit success\n");
     logEntry_t entry;
     while (1) {
-        if (SilogTransServerRecv(&entry, sizeof(entry)) > 0) {
+        if (SilogIpcServerRecv(&entry, sizeof(entry)) > 0) {
             printf("receive success, time: %lu\n", entry.ts);
         } else {
             usleep(1000); // 1ms
@@ -32,7 +32,7 @@ void *SilogTransServerTestInit(void *arg)
 int main()
 {
     pthread_t tid;
-    int ret = pthread_create(&tid, NULL, SilogTransServerTestInit, NULL);
+    int ret = pthread_create(&tid, NULL, SilogIpcServerTestInit, NULL);
     if (ret != 0) {
         printf("pthread_create failed: %d\n", ret);
         return -1;
@@ -40,17 +40,17 @@ int main()
     pthread_detach(tid);
 
     usleep(1000 * 1000); // 100ms
-    ret = SilogTransClientInit();
+    ret = SilogIpcClientInit();
     if (ret != SILOG_OK) {
-        printf("SilogTransClientInit failed: %d\n", ret);
+        printf("SilogIpcClientInit failed: %d\n", ret);
         return -1;
     }
-    printf("SilogTransClientInit success\n");
+    printf("SilogIpcClientInit success\n");
     logEntry_t entry;
     entry.ts = 123456789;
-    ret = SilogTransClientSend(&entry, sizeof(entry));
+    ret = SilogIpcClientSend(&entry, sizeof(entry));
     if (ret != SILOG_OK) {
-        printf("SilogTransClientSend failed: %d\n", ret);
+        printf("SilogIpcClientSend failed: %d\n", ret);
         return -1;
     }
     printf("send success\n");

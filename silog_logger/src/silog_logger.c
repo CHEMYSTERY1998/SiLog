@@ -15,7 +15,7 @@
 #include "silog_prelog.h"
 #include "silog_securec.h"
 #include "silog_time.h"
-#include "silog_trans.h"
+#include "silog_ipc.h"
 #include "silog_utils.h"
 
 #define LOG_ENTRY_QUEUE_CAPACITY 1024
@@ -96,9 +96,9 @@ STATIC void *silogEntrySendHandle(void *arg)
             usleep(US_PER_MS);
             continue;
         }
-        ret = SilogTransClientSend(&entry, sizeof(logEntry_t));
+        ret = SilogIpcClientSend(&entry, sizeof(logEntry_t));
         if (ret != SILOG_OK) {
-            SILOG_PRELOG_E(SILOG_PRELOG_LOGGER, "SilogTransClientSend failed, ret=%u", ret);
+            SILOG_PRELOG_E(SILOG_PRELOG_LOGGER, "SilogIpcClientSend failed, ret=%u", ret);
         }
     }
 }
@@ -106,10 +106,10 @@ STATIC void *silogEntrySendHandle(void *arg)
 STATIC int32_t silogEntrySendTaskInit(void)
 {
     pthread_t tid;
-    SilogTransInit(SILOG_TRAN_TYPE_UDP);
-    int32_t ret = SilogTransClientInit();
+    SilogIpcInit(SILOG_IPC_TYPE_UNIX_DGRAM);
+    int32_t ret = SilogIpcClientInit();
     if (ret != SILOG_OK) {
-        SILOG_PRELOG_E(SILOG_PRELOG_LOGGER, "trans init failed, ret=%u", ret);
+        SILOG_PRELOG_E(SILOG_PRELOG_LOGGER, "ipc init failed, ret=%u", ret);
         return ret;
     }
 

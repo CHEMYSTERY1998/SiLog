@@ -9,7 +9,7 @@ add_executable(silog_unittest
     pqueue_test.cpp
     time_test.cpp
     securec_test.cpp
-    trans_test.cpp
+    ipc_test.cpp
     prelog_test.cpp
 )
 

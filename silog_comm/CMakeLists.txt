@@ -2,7 +2,7 @@
 add_library(
   silog_common STATIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_utils.c
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_trans.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_ipc.c
   ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_time.c
   ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_mpsc.c
   ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_pqueue.c

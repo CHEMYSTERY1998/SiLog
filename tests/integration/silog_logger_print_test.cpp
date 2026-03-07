@@ -3,7 +3,7 @@
 #include "silog_logger.h"
 #include "silog_securec.h"
 #include "silog_time.h"
-#include "silog_trans.h"
+#include "silog_ipc.h"
 
 #include <gtest/gtest.h>
 

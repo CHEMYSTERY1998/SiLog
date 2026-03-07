@@ -15,7 +15,7 @@
 #include "silog_prelog.h"
 #include "silog_securec.h"
 #include "silog_time.h"
-#include "silog_trans.h"
+#include "silog_ipc.h"
 #include "silog_utils.h"
 
 #define US_PER_MS                 1000 // 微秒每毫秒
@@ -37,17 +37,17 @@ SilogDaemonManager g_silogDaemonMgr = {0};
 */
 STATIC void *SilogDaemonRecvThreadFunc(void *arg)
 {
-    SilogTransInit(SILOG_TRAN_TYPE_UDP);
+    SilogIpcInit(SILOG_IPC_TYPE_UNIX_DGRAM);
     (void)arg;
-    int32_t ret = SilogTransServerInit();
+    int32_t ret = SilogIpcServerInit();
     if (ret != SILOG_OK) {
-        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "SilogTransServerInit failed: %d", ret);
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "SilogIpcServerInit failed: %d", ret);
         return NULL;
     }
     ret = SilogMpscQueueInit(&g_silogDaemonMgr.logQueue, sizeof(logEntry_t), DAEMON_LOG_QUEUE_CAPACITY);
     logEntry_t entry;
     while (1) {
-        int32_t n = SilogTransServerRecv(&entry, sizeof(logEntry_t));
+        int32_t n = SilogIpcServerRecv(&entry, sizeof(logEntry_t));
         if (n > 0) {
             ret = SilogMpscQueuePush(&g_silogDaemonMgr.logQueue, &entry);
             if (ret != SILOG_OK) {

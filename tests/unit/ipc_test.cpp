@@ -1,6 +1,6 @@
 #include "silog_error.h"
+#include "silog_ipc.h"
 #include "silog_securec.h"
-#include "silog_trans.h"
 
 #include <errno.h>
 #include <gtest/gtest.h>
@@ -12,73 +12,73 @@
 // 代码中定义的 socket 路径
 #define LOGD_SOCKET_PATH "/tmp/logd.sock"
 
-// ==================== Trans 测试 ====================
-// 注意：由于 silog_trans.c 使用全局静态变量 g_silogTranAgent
-// SilogTransInit 在 isInit=true 后不会再更新类型
+// ==================== IPC 测试 ====================
+// 注意：由于 silog_ipc.c 使用全局静态变量 g_silogIpcAgent
+// SilogIpcInit 在 isInit=true 后不会再更新类型
 
-// 测试：TCP 类型未实现
-TEST(TransTest, TcpTypeNotImplemented)
+// 测试：Stream 类型未实现
+TEST(IpcTest, StreamTypeNotImplemented)
 {
     /* 全局状态初始时，isInit = false，函数指针为 NULL */
-    SilogTransInit(SILOG_TRAN_TYPE_TCP);
+    SilogIpcInit(SILOG_IPC_TYPE_UNIX_STREAM);
 
-    EXPECT_EQ(SilogTransClientInit(), SILOG_NOT_IMPLEMENTED);
-    EXPECT_EQ(SilogTransClientSend("test", 4), SILOG_NOT_IMPLEMENTED);
-    EXPECT_EQ(SilogTransServerInit(), SILOG_NOT_IMPLEMENTED);
-    EXPECT_EQ(SilogTransServerRecv(nullptr, 0), SILOG_NOT_IMPLEMENTED);
+    EXPECT_EQ(SilogIpcClientInit(), SILOG_NOT_IMPLEMENTED);
+    EXPECT_EQ(SilogIpcClientSend("test", 4), SILOG_NOT_IMPLEMENTED);
+    EXPECT_EQ(SilogIpcServerInit(), SILOG_NOT_IMPLEMENTED);
+    EXPECT_EQ(SilogIpcServerRecv(nullptr, 0), SILOG_NOT_IMPLEMENTED);
 
     /* Close 函数不返回值，但应该不会崩溃 */
-    SilogTransClientClose();
-    SilogTransServerClose();
+    SilogIpcClientClose();
+    SilogIpcServerClose();
 }
 
-// 测试：UDP 类型初始化
-TEST(TransTest, UdpTypeInit)
+// 测试：Dgram 类型初始化
+TEST(IpcTest, DgramTypeInit)
 {
-    /* 注意：前面的测试已经调用了 SilogTransInit(SILOG_TRAN_TYPE_TCP) */
+    /* 注意：前面的测试已经调用了 SilogIpcInit(SILOG_IPC_TYPE_UNIX_STREAM) */
     /* 由于 isInit 已经为 true，再次 Init 不会改变类型 */
-    /* 但实际上 TCP 的函数指针是 NULL，所以调用 Init 应该返回 NOT_IMPLEMENTED */
+    /* 但实际上 Stream 的函数指针是 NULL，所以调用 Init 应该返回 NOT_IMPLEMENTED */
     /* 实际上这个测试验证的是：当 isInit=true 时，函数指针不会被更新 */
-    EXPECT_EQ(SilogTransClientInit(), SILOG_NOT_IMPLEMENTED);
+    EXPECT_EQ(SilogIpcClientInit(), SILOG_NOT_IMPLEMENTED);
 }
 
 // 测试：ServerClose 重复调用安全
-TEST(TransTest, ServerCloseRepeated)
+TEST(IpcTest, ServerCloseRepeated)
 {
-    SilogTransServerClose();
-    SilogTransServerClose();
-    SilogTransServerClose();
+    SilogIpcServerClose();
+    SilogIpcServerClose();
+    SilogIpcServerClose();
     /* 不应该崩溃 */
 }
 
 // 测试：ClientClose 重复调用安全
-TEST(TransTest, ClientCloseRepeated)
+TEST(IpcTest, ClientCloseRepeated)
 {
-    SilogTransClientClose();
-    SilogTransClientClose();
-    SilogTransClientClose();
+    SilogIpcClientClose();
+    SilogIpcClientClose();
+    SilogIpcClientClose();
     /* 不应该崩溃 */
 }
 
-// 测试：客户端发送（未初始化 UDP）
-TEST(TransTest, ClientSendWithoutUdpInit)
+// 测试：客户端发送（未初始化 Dgram）
+TEST(IpcTest, ClientSendWithoutDgramInit)
 {
     const char *testData = "Hello";
     size_t testLen = strlen(testData);
-    int ret = SilogTransClientSend(testData, (uint32_t)testLen);
+    int ret = SilogIpcClientSend(testData, (uint32_t)testLen);
     EXPECT_EQ(ret, SILOG_NOT_IMPLEMENTED);
 }
 
-// 测试：服务器接收（未初始化 UDP）
-TEST(TransTest, ServerRecvWithoutUdpInit)
+// 测试：服务器接收（未初始化 Dgram）
+TEST(IpcTest, ServerRecvWithoutDgramInit)
 {
     char buffer[128];
-    int ret = SilogTransServerRecv(buffer, sizeof(buffer));
+    int ret = SilogIpcServerRecv(buffer, sizeof(buffer));
     EXPECT_EQ(ret, SILOG_NOT_IMPLEMENTED);
 }
 
 // ==================== 使用原生 socket 的集成测试 ====================
-// 这些测试不依赖 silog_trans 的全局状态
+// 这些测试不依赖 silog_ipc 的全局状态
 // 而是直接使用 Unix socket 来测试通信机制
 
 class SocketCommTest : public ::testing::Test {
