@@ -29,10 +29,13 @@ target_link_libraries(silog_unittest
 
 include(GoogleTest)
 
-# TSan 模式下禁用测试发现（WSL2 兼容性问题）
-if(ENABLE_TSAN)
-    # 使用简单的测试添加方式
-    add_test(NAME silog_unittest COMMAND silog_unittest)
+# 根据 ENABLE_TEST_DISCOVERY 选项决定测试发现方式
+# ON:  使用 gtest_discover_tests 显示单个测试用例（verbose 模式）
+# OFF: 使用 add_test 只显示测试套（summary 模式）
+if(ENABLE_TEST_DISCOVERY)
+    message(STATUS "Test discovery enabled - individual test cases will be shown")
+    gtest_discover_tests(silog_unittest DISCOVERY_MODE PRE_TEST)
 else()
-    gtest_discover_tests(silog_unittest)
+    message(STATUS "Test discovery disabled - only test suites will be shown")
+    add_test(NAME silog_unittest COMMAND silog_unittest)
 endif()

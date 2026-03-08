@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.18)
 project(silog_system)
 
 # 启用测试
@@ -30,6 +30,9 @@ option(ENABLE_TSAN "Enable ThreadSanitizer" OFF)
 
 # 选项：启用 LCOV 覆盖率
 option(ENABLE_LCOV "Enable LCOV code coverage" OFF)
+
+# 选项：启用测试发现（显示单个测试用例）
+option(ENABLE_TEST_DISCOVERY "Enable individual test case discovery" OFF)
 
 # 添加编译选项
 add_compile_options(-Wall -Wextra -Werror -DDEBUG)

@@ -1,4 +1,5 @@
 build/
 .vscode/
 .claude/
-test/report/
+tests/report/
+CLAUDE.md

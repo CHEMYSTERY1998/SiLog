@@ -27,9 +27,13 @@ target_link_libraries(silog_integrationtest
 
 include(GoogleTest)
 
-# TSan 模式下禁用测试发现（WSL2 兼容性问题）
-if(ENABLE_TSAN)
-    add_test(NAME silog_integrationtest COMMAND silog_integrationtest)
+# 根据 ENABLE_TEST_DISCOVERY 选项决定测试发现方式
+# ON:  使用 gtest_discover_tests 显示单个测试用例（verbose 模式）
+# OFF: 使用 add_test 只显示测试套（summary 模式）
+if(ENABLE_TEST_DISCOVERY)
+    message(STATUS "Test discovery enabled - individual test cases will be shown")
+    gtest_discover_tests(silog_integrationtest DISCOVERY_MODE PRE_TEST)
 else()
-    gtest_discover_tests(silog_integrationtest)
+    message(STATUS "Test discovery disabled - only test suites will be shown")
+    add_test(NAME silog_integrationtest COMMAND silog_integrationtest)
 endif()
