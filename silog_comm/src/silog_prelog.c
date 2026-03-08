@@ -7,6 +7,7 @@
 
 #include <errno.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <string.h>
 
 #include "silog_error.h"
@@ -18,7 +19,7 @@ typedef struct {
     FILE *file;
     pthread_mutex_t lock;
     SilogPrelogConfig_t config;
-    bool initialized;
+    atomic_bool initialized;
 } SilogPrelogManager_t;
 
 static SilogPrelogManager_t g_prelogMgr = {
@@ -48,7 +49,7 @@ int32_t SilogPrelogInit(const SilogPrelogConfig_t *config)
 {
     pthread_mutex_lock(&g_prelogMgr.lock);
 
-    if (g_prelogMgr.initialized) {
+    if (atomic_load(&g_prelogMgr.initialized)) {
         pthread_mutex_unlock(&g_prelogMgr.lock);
         return SILOG_OK;
     }
@@ -73,7 +74,7 @@ int32_t SilogPrelogInit(const SilogPrelogConfig_t *config)
         }
     }
 
-    g_prelogMgr.initialized = true;
+    atomic_store(&g_prelogMgr.initialized, true);
 
     pthread_mutex_unlock(&g_prelogMgr.lock);
 
@@ -84,7 +85,7 @@ void SilogPrelogDeinit(void)
 {
     pthread_mutex_lock(&g_prelogMgr.lock);
 
-    if (!g_prelogMgr.initialized) {
+    if (!atomic_load(&g_prelogMgr.initialized)) {
         pthread_mutex_unlock(&g_prelogMgr.lock);
         return;
     }
@@ -95,10 +96,9 @@ void SilogPrelogDeinit(void)
         g_prelogMgr.file = NULL;
     }
 
-    g_prelogMgr.initialized = false;
+    atomic_store(&g_prelogMgr.initialized, false);
 
     pthread_mutex_unlock(&g_prelogMgr.lock);
-    pthread_mutex_destroy(&g_prelogMgr.lock);
 }
 
 int32_t SilogPrelogWriteV(const char *module, SilogPrelogLevel_t level, const char *fmt, va_list args)
@@ -109,7 +109,7 @@ int32_t SilogPrelogWriteV(const char *module, SilogPrelogLevel_t level, const ch
 
     pthread_mutex_lock(&g_prelogMgr.lock);
 
-    if (!g_prelogMgr.initialized) {
+    if (!atomic_load(&g_prelogMgr.initialized)) {
         pthread_mutex_unlock(&g_prelogMgr.lock);
         return SILOG_TRANS_NOT_INIT;
     }
@@ -173,10 +173,7 @@ int32_t SilogPrelogWrite(const char *module, SilogPrelogLevel_t level, const cha
 
 bool SilogPrelogIsInitialized(void)
 {
-    pthread_mutex_lock(&g_prelogMgr.lock);
-    bool initialized = g_prelogMgr.initialized;
-    pthread_mutex_unlock(&g_prelogMgr.lock);
-    return initialized;
+    return atomic_load(&g_prelogMgr.initialized);
 }
 
 FILE *SilogPrelogGetFile(void)

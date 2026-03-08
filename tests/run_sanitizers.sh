@@ -5,7 +5,7 @@
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 PROJECT_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
-REPORT_DIR="$PROJECT_ROOT/test/report"
+REPORT_DIR="$PROJECT_ROOT/tests/report"
 
 # 检测是否在 WSL2 环境
 is_wsl2() {

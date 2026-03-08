@@ -77,6 +77,14 @@ STATIC int32_t SilogIpcDgramClientInit(void)
     return SILOG_OK;
 }
 
+STATIC void SilogIpcDgramClientClose(void)
+{
+    if (g_silogIpcAgent.sendFd >= 0) {
+        close(g_silogIpcAgent.sendFd);
+        g_silogIpcAgent.sendFd = -1;
+    }
+}
+
 STATIC int32_t SilogIpcDgramClientSend(const void *data, uint32_t len)
 {
     if (g_silogIpcAgent.sendFd < 0) {
@@ -86,19 +94,24 @@ STATIC int32_t SilogIpcDgramClientSend(const void *data, uint32_t len)
 
     int32_t n = send(g_silogIpcAgent.sendFd, data, len, 0);
     if (n < 0) {
+        /* 如果发送失败（可能是服务器重启），尝试重新连接 */
+        if (errno == ECONNREFUSED || errno == ENOENT) {
+            SILOG_PRELOG_W(SILOG_PRELOG_COMM, "Server disconnected, attempting reconnect...");
+            SilogIpcDgramClientClose();
+            int32_t ret = SilogIpcDgramClientInit();
+            if (ret == SILOG_OK) {
+                /* 重试发送 */
+                n = send(g_silogIpcAgent.sendFd, data, len, 0);
+                if (n >= 0) {
+                    return SILOG_OK;
+                }
+            }
+        }
         SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Client send failed: %s", strerror(errno));
         return SILOG_NET_SEND;
     }
 
     return SILOG_OK;
-}
-
-STATIC void SilogIpcDgramClientClose(void)
-{
-    if (g_silogIpcAgent.sendFd >= 0) {
-        close(g_silogIpcAgent.sendFd);
-        g_silogIpcAgent.sendFd = -1;
-    }
 }
 
 STATIC int32_t SilogIpcDgramServerInit(void)
