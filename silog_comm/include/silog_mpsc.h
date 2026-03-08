@@ -27,11 +27,13 @@ extern "C" {
  * @note 队列容量必须是 2 的幂
  */
 typedef struct {
-    uint8_t *buffer;      ///< 环形缓冲区
-    uint32_t elementSize; ///< 每个元素大小
-    uint32_t capacity;    ///< 队列容量（必须是 2 的幂）
-    atomic_uint writePos; ///< 多生产者写指针
-    atomic_uint readPos;  ///< 单消费者读指针
+    uint8_t *buffer;           ///< 环形缓冲区
+    uint32_t elementSize;      ///< 每个元素大小
+    uint32_t capacity;         ///< 队列容量（必须是 2 的幂）
+    atomic_uint writePos;      ///< 多生产者写指针
+    atomic_uint readPos;       ///< 单消费者读指针
+    atomic_uint *seq;          ///< 顺序标记数组（用于同步）
+    uint32_t capacityMask;     ///< 容量掩码（capacity - 1）
 } SiLogMpscQueue;
 
 /**

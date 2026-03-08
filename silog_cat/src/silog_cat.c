@@ -11,6 +11,7 @@
 
 #include "silog_prelog.h"
 #include "silog_remote.h"
+#include "silog_securec.h"
 
 /**
  * @brief silogcat 配置
@@ -248,8 +249,8 @@ int main(int argc, char *argv[])
         .useReconnect = true,
         .reconnectMs = 5000,
     };
-    strncpy(remoteConfig.serverAddr, g_silogCatConfig.serverAddr, sizeof(remoteConfig.serverAddr) - 1);
-    remoteConfig.serverAddr[sizeof(remoteConfig.serverAddr) - 1] = '\0';
+    (void)strncpy_s(remoteConfig.serverAddr, sizeof(remoteConfig.serverAddr),
+                    g_silogCatConfig.serverAddr, sizeof(remoteConfig.serverAddr) - 1);
 
     int32_t ret = SilogRemoteClientInit(&remoteConfig);
     if (ret != 0) {

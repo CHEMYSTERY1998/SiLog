@@ -26,4 +26,10 @@ target_link_libraries(silog_integrationtest
 )
 
 include(GoogleTest)
-gtest_discover_tests(silog_integrationtest)
+
+# TSan 模式下禁用测试发现（WSL2 兼容性问题）
+if(ENABLE_TSAN)
+    add_test(NAME silog_integrationtest COMMAND silog_integrationtest)
+else()
+    gtest_discover_tests(silog_integrationtest)
+endif()

@@ -87,7 +87,9 @@ static pid_t SilogExeReadPidFile(void)
         return -1;
     }
     pid_t pid = -1;
-    fscanf(fp, "%d", &pid);
+    if (fscanf(fp, "%d", &pid) != 1) {
+        pid = -1;
+    }
     fclose(fp);
     return pid;
 }
@@ -174,9 +176,15 @@ static int32_t SilogExeStartDaemon(void)
     }
 
     /* 重定向标准输入输出 */
-    freopen("/dev/null", "r", stdin);
-    freopen("/dev/null", "w", stdout);
-    freopen("/dev/null", "w", stderr);
+    if (freopen("/dev/null", "r", stdin) == NULL) {
+        /* 忽略错误 */
+    }
+    if (freopen("/dev/null", "w", stdout) == NULL) {
+        /* 忽略错误 */
+    }
+    if (freopen("/dev/null", "w", stderr) == NULL) {
+        /* 忽略错误 */
+    }
 
     /* 初始化预日志模块（后台模式） */
     SilogPrelogConfig_t prelogConfig = {

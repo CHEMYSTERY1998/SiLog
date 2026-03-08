@@ -28,4 +28,11 @@ target_link_libraries(silog_unittest
 )
 
 include(GoogleTest)
-gtest_discover_tests(silog_unittest)
+
+# TSan 模式下禁用测试发现（WSL2 兼容性问题）
+if(ENABLE_TSAN)
+    # 使用简单的测试添加方式
+    add_test(NAME silog_unittest COMMAND silog_unittest)
+else()
+    gtest_discover_tests(silog_unittest)
+endif()
