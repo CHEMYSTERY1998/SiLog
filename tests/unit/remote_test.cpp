@@ -397,3 +397,218 @@ TEST_F(RemoteClientTest, BroadcastNoClients)
     EXPECT_EQ(ret, SILOG_OK);
     EXPECT_EQ(sent, 0);
 }
+
+// ==================== 远程客户端测试（不使用fixture） ====================
+
+class RemoteClientTestStandalone : public ::testing::Test {
+  protected:
+    void SetUp() override {
+        SilogRemoteClientDeinit();
+    }
+    void TearDown() override {
+        SilogRemoteClientDeinit();
+    }
+};
+
+TEST_F(RemoteClientTestStandalone, ClientInitWithNullConfig)
+{
+    // 先反初始化
+    SilogRemoteClientDeinit();
+
+    // 使用 NULL 配置初始化
+    int32_t ret = SilogRemoteClientInit(NULL);
+    EXPECT_EQ(ret, SILOG_OK);
+
+    // 清理
+    SilogRemoteClientDeinit();
+}
+
+TEST_F(RemoteClientTestStandalone, ClientDoubleInit)
+{
+    SilogRemoteClientDeinit();
+
+    int32_t ret = SilogRemoteClientInit(NULL);
+    EXPECT_EQ(ret, SILOG_OK);
+
+    // 第二次初始化应该返回 OK，但不会重新创建
+    ret = SilogRemoteClientInit(NULL);
+    EXPECT_EQ(ret, SILOG_OK);
+
+    SilogRemoteClientDeinit();
+}
+
+TEST_F(RemoteClientTestStandalone, ClientConnectToInvalidServer)
+{
+    SilogRemoteClientDeinit();
+
+    SilogRemoteClientConfig config;
+    (void)memset_s(&config, sizeof(config), 0, sizeof(config));
+    config.serverPort = 1; // 无效端口
+    (void)strncpy_s(config.serverAddr, sizeof(config.serverAddr),
+                    "127.0.0.1", strlen("127.0.0.1"));
+
+    int32_t ret = SilogRemoteClientInit(&config);
+    EXPECT_EQ(ret, SILOG_OK);
+
+    // 连接到无效端口应该失败
+    ret = SilogRemoteClientConnect();
+    EXPECT_NE(ret, SILOG_OK);
+
+    SilogRemoteClientDeinit();
+}
+
+TEST_F(RemoteClientTestStandalone, ClientReceiveWithoutInit)
+{
+    SilogRemoteClientDeinit();
+
+    auto callback = [](const logEntry_t* entry, void* userData) {
+        (void)entry;
+        (void)userData;
+    };
+    int32_t ret = SilogRemoteClientReceive(callback, NULL, 100);
+    EXPECT_NE(ret, SILOG_OK);
+}
+
+TEST_F(RemoteClientTestStandalone, ClientReceiveWithoutConnect)
+{
+    SilogRemoteClientDeinit();
+
+    // 初始化但不连接
+    SilogRemoteClientConfig config;
+    (void)memset_s(&config, sizeof(config), 0, sizeof(config));
+    config.serverPort = 9090;
+    (void)strncpy_s(config.serverAddr, sizeof(config.serverAddr),
+                    "127.0.0.1", strlen("127.0.0.1"));
+
+    int32_t ret = SilogRemoteClientInit(&config);
+    EXPECT_EQ(ret, SILOG_OK);
+
+    // 未连接时接收应该失败（使用回调函数方式）
+    auto callback = [](const logEntry_t* entry, void* userData) {
+        (void)entry;
+        (void)userData;
+    };
+    ret = SilogRemoteClientReceive(callback, NULL, 100);
+    EXPECT_NE(ret, SILOG_OK);
+
+    SilogRemoteClientDeinit();
+}
+
+TEST_F(RemoteClientTestStandalone, ClientDeinitWithoutInit)
+{
+    SilogRemoteClientDeinit();
+
+    // 反初始化未初始化的客户端应该安全
+    SilogRemoteClientDeinit();
+    // 测试通过标准：没有崩溃
+    EXPECT_TRUE(true);
+}
+
+TEST_F(RemoteClientTestStandalone, ClientIsConnectedWithoutInit)
+{
+    SilogRemoteClientDeinit();
+
+    // 未初始化时应该返回 false
+    EXPECT_FALSE(SilogRemoteClientIsConnected());
+}
+
+TEST_F(RemoteClientTestStandalone, ClientIsConnectedAfterInit)
+{
+    SilogRemoteClientDeinit();
+
+    // 初始化但未连接
+    SilogRemoteClientConfig config;
+    (void)memset_s(&config, sizeof(config), 0, sizeof(config));
+    config.serverPort = 9090;
+    (void)strncpy_s(config.serverAddr, sizeof(config.serverAddr),
+                    "127.0.0.1", strlen("127.0.0.1"));
+
+    int32_t ret = SilogRemoteClientInit(&config);
+    EXPECT_EQ(ret, SILOG_OK);
+
+    // 初始化后但未连接时应该返回 false
+    EXPECT_FALSE(SilogRemoteClientIsConnected());
+
+    SilogRemoteClientDeinit();
+}
+
+// 全局回调函数计数器
+static int g_callbackCount = 0;
+
+static void TestCallback(const logEntry_t* entry, void* userData)
+{
+    (void)entry;
+    (void)userData;
+    g_callbackCount++;
+}
+
+TEST_F(RemoteClientTestStandalone, ClientReceiveTimeout)
+{
+    SilogRemoteClientDeinit();
+    g_callbackCount = 0;
+
+    // 初始化客户端
+    SilogRemoteClientConfig config;
+    (void)memset_s(&config, sizeof(config), 0, sizeof(config));
+    config.serverPort = 9090;
+    (void)strncpy_s(config.serverAddr, sizeof(config.serverAddr),
+                    "127.0.0.1", strlen("127.0.0.1"));
+
+    int32_t ret = SilogRemoteClientInit(&config);
+    EXPECT_EQ(ret, SILOG_OK);
+
+    // 尝试连接（可能会失败，但我们需要测试接收超时）
+    (void)SilogRemoteClientConnect();
+
+    // 使用100ms超时接收（应该超时因为没有数据）
+    ret = SilogRemoteClientReceive(TestCallback, NULL, 100);
+    // 未连接或超时情况下应该返回错误
+    EXPECT_NE(ret, SILOG_OK);
+
+    SilogRemoteClientDeinit();
+}
+
+TEST_F(RemoteClientTestStandalone, ClientReceiveZeroTimeout)
+{
+    SilogRemoteClientDeinit();
+
+    // 初始化客户端
+    SilogRemoteClientConfig config;
+    (void)memset_s(&config, sizeof(config), 0, sizeof(config));
+    config.serverPort = 9090;
+    (void)strncpy_s(config.serverAddr, sizeof(config.serverAddr),
+                    "127.0.0.1", strlen("127.0.0.1"));
+
+    int32_t ret = SilogRemoteClientInit(&config);
+    EXPECT_EQ(ret, SILOG_OK);
+
+    // 使用0ms超时（非阻塞）
+    ret = SilogRemoteClientReceive(TestCallback, NULL, 0);
+    // 未连接时应该立即返回错误
+    EXPECT_NE(ret, SILOG_OK);
+
+    SilogRemoteClientDeinit();
+}
+
+TEST_F(RemoteClientTestStandalone, ClientIsInit)
+{
+    SilogRemoteClientDeinit();
+
+    // 未初始化时
+    EXPECT_FALSE(SilogRemoteClientIsInit());
+
+    // 初始化后
+    SilogRemoteClientConfig config;
+    (void)memset_s(&config, sizeof(config), 0, sizeof(config));
+    config.serverPort = 9090;
+    (void)strncpy_s(config.serverAddr, sizeof(config.serverAddr),
+                    "127.0.0.1", strlen("127.0.0.1"));
+
+    int32_t ret = SilogRemoteClientInit(&config);
+    EXPECT_EQ(ret, SILOG_OK);
+    EXPECT_TRUE(SilogRemoteClientIsInit());
+
+    // 反初始化后
+    SilogRemoteClientDeinit();
+    EXPECT_FALSE(SilogRemoteClientIsInit());
+}

@@ -99,3 +99,147 @@ TEST_F(MpscQueueTest, MultiThread)
     EXPECT_GT(popCount, 0);
     EXPECT_EQ(popCount, totalPushed);
 }
+
+TEST_F(MpscQueueTest, NullArguments)
+{
+    TestItem item = {42};
+    TestItem out;
+
+    // Push with NULL queue
+    EXPECT_NE(SilogMpscQueuePush(NULL, &item), 0);
+
+    // Push with NULL element
+    EXPECT_NE(SilogMpscQueuePush(&queue, NULL), 0);
+
+    // Pop with NULL queue
+    EXPECT_NE(SilogMpscQueuePop(NULL, &out), 0);
+
+    // Pop with NULL out element
+    EXPECT_NE(SilogMpscQueuePop(&queue, NULL), 0);
+}
+
+TEST_F(MpscQueueTest, QueueFull)
+{
+    // 填满队列（容量 1024）
+    int pushed = 0;
+    for (int i = 0; i < 1024; i++) {
+        TestItem item = {i};
+        if (SilogMpscQueuePush(&queue, &item) == 0) {
+            pushed++;
+        } else {
+            break;
+        }
+    }
+
+    // 队列已满，再推应该失败
+    TestItem item = {9999};
+    EXPECT_NE(SilogMpscQueuePush(&queue, &item), 0);
+
+    // 弹出一个
+    TestItem out;
+    EXPECT_EQ(SilogMpscQueuePop(&queue, &out), 0);
+
+    // 现在可以推入了
+    EXPECT_EQ(SilogMpscQueuePush(&queue, &item), 0);
+}
+
+TEST_F(MpscQueueTest, InitInvalidArgs)
+{
+    SiLogMpscQueue q;
+
+    // NULL queue
+    EXPECT_NE(SilogMpscQueueInit(NULL, sizeof(TestItem), 1024), 0);
+
+    // Zero element size
+    EXPECT_NE(SilogMpscQueueInit(&q, 0, 1024), 0);
+
+    // Zero capacity
+    EXPECT_NE(SilogMpscQueueInit(&q, sizeof(TestItem), 0), 0);
+
+    // Non-power-of-2 capacity
+    EXPECT_NE(SilogMpscQueueInit(&q, sizeof(TestItem), 100), 0);
+}
+
+TEST_F(MpscQueueTest, DestroyNull)
+{
+    // 销毁 NULL 队列应该安全
+    SilogMpscQueueDestroy(NULL);
+}
+
+TEST_F(MpscQueueTest, SingleProducerSingleConsumer)
+{
+    const int count = 500;
+    std::thread producer([this, count]() {
+        for (int i = 0; i < count; i++) {
+            TestItem item = {i};
+            while (SilogMpscQueuePush(&queue, &item) != 0) {
+                std::this_thread::yield();
+            }
+        }
+    });
+
+    int received = 0;
+    int expected = 0;
+    while (expected < count) {
+        TestItem out;
+        if (SilogMpscQueuePop(&queue, &out) == 0) {
+            EXPECT_EQ(out.value, expected);
+            expected++;
+            received++;
+        }
+    }
+
+    producer.join();
+    EXPECT_EQ(received, count);
+}
+
+TEST_F(MpscQueueTest, PopFromEmptyThenPush)
+{
+    TestItem out;
+
+    // 先尝试弹出（空队列）
+    EXPECT_NE(SilogMpscQueuePop(&queue, &out), 0);
+
+    // 然后推入
+    TestItem item = {42};
+    EXPECT_EQ(SilogMpscQueuePush(&queue, &item), 0);
+
+    // 现在可以弹出
+    EXPECT_EQ(SilogMpscQueuePop(&queue, &out), 0);
+    EXPECT_EQ(out.value, 42);
+}
+
+TEST_F(MpscQueueTest, WrapAround)
+{
+    // 测试环形缓冲区的回绕
+    const int capacity = 1024;
+
+    // 填满队列
+    for (int i = 0; i < capacity; i++) {
+        TestItem item = {i};
+        ASSERT_EQ(SilogMpscQueuePush(&queue, &item), 0);
+    }
+
+    // 弹出 512 个
+    TestItem out;
+    for (int i = 0; i < 512; i++) {
+        ASSERT_EQ(SilogMpscQueuePop(&queue, &out), 0);
+        EXPECT_EQ(out.value, i);
+    }
+
+    // 再推入 512 个（应该回绕）
+    for (int i = 0; i < 512; i++) {
+        TestItem item = {10000 + i};
+        ASSERT_EQ(SilogMpscQueuePush(&queue, &item), 0);
+    }
+
+    // 验证顺序
+    for (int i = 512; i < capacity; i++) {
+        ASSERT_EQ(SilogMpscQueuePop(&queue, &out), 0);
+        EXPECT_EQ(out.value, i);
+    }
+    for (int i = 0; i < 512; i++) {
+        ASSERT_EQ(SilogMpscQueuePop(&queue, &out), 0);
+        EXPECT_EQ(out.value, 10000 + i);
+    }
+}

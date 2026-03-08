@@ -326,7 +326,7 @@ errno_t strstr_s(const char *str, size_t strMax, const char *substr, size_t subs
         return EINVAL;
     }
 
-    if (substr == NULL || substrMax == 0) {
+    if (substr == NULL) {
         return EINVAL;
     }
 
@@ -336,6 +336,10 @@ errno_t strstr_s(const char *str, size_t strMax, const char *substr, size_t subs
     if (subLen == 0) {
         *position = 0;
         return EOK;
+    }
+
+    if (substrMax == 0) {
+        return EINVAL;
     }
 
     if (subLen > strLen) {

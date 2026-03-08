@@ -12,6 +12,11 @@ add_executable(silog_unittest
     ipc_test.cpp
     prelog_test.cpp
     remote_test.cpp
+    utils_test.cpp
+    file_manager_test.cpp
+    daemon_test.cpp
+    file_manager_exception_test.cpp
+    daemon_exception_test.cpp
 )
 
 target_include_directories(silog_unittest

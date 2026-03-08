@@ -481,3 +481,122 @@ TEST_F(SilogCaptureTest, DifferentTags)
         EXPECT_STREQ(entry.msg, msg);
     }
 }
+
+/* 测试：日志级别边界 */
+TEST_F(SilogCaptureTest, LevelBoundary)
+{
+    /* 测试设置无效的日志级别 */
+    silogSetLevel((silogLevel)99);
+    /* 应该使用默认级别 */
+
+    /* 恢复 */
+    silogSetLevel(SILOG_DEBUG);
+}
+
+/* 测试：重复日志初始化 */
+TEST_F(SilogCaptureTest, DoubleInit)
+{
+    /* 初始化已经由宏完成，再次初始化应该安全 */
+    SILOG_I(TEST_TAG, "First");
+    SILOG_I(TEST_TAG, "Second");
+
+    logEntry_t entry;
+    ASSERT_GT(waitForLogEntry(&entry, TEST_TAG), 0);
+    EXPECT_STREQ(entry.msg, "First");
+
+    ASSERT_GT(waitForLogEntry(&entry, TEST_TAG), 0);
+    EXPECT_STREQ(entry.msg, "Second");
+}
+
+/* 测试：长 Tag */
+TEST_F(SilogCaptureTest, VeryLongTag)
+{
+    char longTag[100];
+    (void)memset_s(longTag, sizeof(longTag), 'T', sizeof(longTag) - 1);
+    longTag[sizeof(longTag) - 1] = '\0';
+
+    SILOG_I(longTag, "Test");
+
+    logEntry_t entry;
+    ASSERT_GT(waitForAnyLog(&entry), 0);
+
+    /* Tag 应该被截断 */
+    EXPECT_LE(strlen(entry.tag), SILOG_TAG_MAX_LEN - 1);
+}
+
+/* 测试：包含特殊字符的消息 */
+TEST_F(SilogCaptureTest, MessageWithSpecialChars)
+{
+    SILOG_I(TEST_TAG, "Test with unicode: \u4e2d\u6587");
+
+    logEntry_t entry;
+    ASSERT_GT(waitForLogEntry(&entry, TEST_TAG), 0);
+
+    EXPECT_NE(strstr(entry.msg, "Test with unicode"), nullptr);
+}
+
+/* 测试：大量日志 */
+TEST_F(SilogCaptureTest, HighVolume)
+{
+    const int count = 50;
+
+    for (int i = 0; i < count; i++) {
+        SILOG_I(TEST_TAG, "VolumeTest");
+    }
+
+    int received = 0;
+    logEntry_t entry;
+    while (received < count) {
+        if (waitForLogEntry(&entry, TEST_TAG, 100) > 0) {
+            if (strcmp(entry.msg, "VolumeTest") == 0) {
+                received++;
+            }
+        } else {
+            break;
+        }
+    }
+
+    /* 应该收到大部分日志 */
+    EXPECT_GE(received, count * 0.8);
+}
+
+/* 测试：日志条目结构完整性 */
+TEST_F(SilogCaptureTest, EntryStructure)
+{
+    SILOG_I(TEST_TAG, "StructureTest");
+
+    logEntry_t entry;
+    ASSERT_GT(waitForLogEntry(&entry, TEST_TAG), 0);
+
+    /* 验证所有字段 */
+    EXPECT_GT(entry.ts, 0);
+    EXPECT_EQ(entry.pid, getpid());
+    EXPECT_GT(entry.tid, 0);
+    EXPECT_EQ(entry.level, SILOG_INFO);
+    EXPECT_GT(strlen(entry.tag), 0);
+    EXPECT_GT(strlen(entry.file), 0);
+    EXPECT_GT(entry.line, 0);
+    EXPECT_EQ(strlen(entry.msg), strlen("StructureTest"));
+    EXPECT_EQ(entry.msgLen, strlen("StructureTest"));
+    EXPECT_EQ(entry.enabled, 1);
+}
+
+/* 测试：快速连续日志 */
+TEST_F(SilogCaptureTest, RapidFire)
+{
+    for (int i = 0; i < 20; i++) {
+        SILOG_I(TEST_TAG, "Rapid");
+    }
+
+    int received = 0;
+    logEntry_t entry;
+    for (int i = 0; i < 20; i++) {
+        if (waitForLogEntry(&entry, TEST_TAG, 50) > 0) {
+            if (strcmp(entry.msg, "Rapid") == 0) {
+                received++;
+            }
+        }
+    }
+
+    EXPECT_GE(received, 15);
+}

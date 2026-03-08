@@ -36,6 +36,10 @@ static volatile bool g_remoteEnabled = false;
 static pthread_t g_remoteThread = 0;
 static volatile bool g_remoteRunning = false;
 
+/* ==================== 守护进程控制标志 ==================== */
+
+static volatile bool g_daemonRunning = false;
+
 /*
     至少需要三个线程，
     1、日志接收线程：负责接收应用进程发送过来的日志数据，并存入缓冲区
@@ -59,8 +63,10 @@ STATIC void *SilogDaemonRecvThreadFunc(void *arg)
         return NULL;
     }
 
+    g_daemonRunning = true;
+
     logEntry_t entry;
-    while (1) {
+    while (g_daemonRunning) {
         int32_t n = SilogIpcServerRecv(&entry, sizeof(logEntry_t));
         if (n > 0) {
             ret = SilogMpscQueuePush(&g_silogDaemonMgr.logQueue, &entry);
@@ -72,6 +78,7 @@ STATIC void *SilogDaemonRecvThreadFunc(void *arg)
         }
     }
 
+    SilogIpcServerClose();
     return NULL;
 }
 
@@ -95,7 +102,7 @@ STATIC void *SilogDaemonWriteThreadFunc(void *arg)
     char timebuf[TIME_BUF_SIZE];
     char logbuf[LOG_MSG_BUF_SIZE];
 
-    while (1) {
+    while (g_daemonRunning) {
         int32_t ret = SilogMpscQueuePop(&g_silogDaemonMgr.logQueue, &entry);
         if (ret == SILOG_OK) {
             // 格式化日志
@@ -145,6 +152,11 @@ STATIC int32_t SilogDaemonWriteThreadInit()
 
 int32_t SilogDaemonInit(void)
 {
+    /* 如果已经在运行，直接返回 */
+    if (g_daemonRunning) {
+        return SILOG_OK;
+    }
+
     /* 初始化预日志模块 */
     SilogPrelogConfig_t prelogConfig = {
         .path = "/tmp/silog_daemon.txt",
@@ -185,11 +197,18 @@ int32_t SilogDaemonInit(void)
         /* 远程服务初始化失败不阻断主流程 */
     }
 
+    g_daemonRunning = true;
     return SILOG_OK;
 }
 
 void SilogDaemonDeinit(void)
 {
+    /* 停止守护进程线程 */
+    g_daemonRunning = false;
+
+    /* 给线程一些时间退出 */
+    usleep(100000); /* 100ms */
+
     /* 反初始化远程服务 */
     SilogDaemonRemoteDeinit();
 
@@ -198,6 +217,10 @@ void SilogDaemonDeinit(void)
 
     /* 反初始化日志文件管理器 */
     SilogFileManagerDeinit();
+
+    /* 销毁 MPSC 队列（如果已初始化） */
+    SilogMpscQueueDestroy(&g_silogDaemonMgr.logQueue);
+    (void)memset_s(&g_silogDaemonMgr, sizeof(g_silogDaemonMgr), 0, sizeof(g_silogDaemonMgr));
 }
 
 /* ==================== 远程服务实现 ==================== */

@@ -235,3 +235,141 @@ TEST_F(SocketCommTest, ConnectSend)
     EXPECT_GT(recvLen, 0);
     EXPECT_STREQ(buffer, testData);
 }
+
+// ==================== silog_ipc 模块更多测试 ====================
+
+// 测试：Dgram 类型完整流程
+TEST(IpcIntegrationTest, DgramFullFlow)
+{
+    // 先关闭之前的状态
+    SilogIpcServerClose();
+    SilogIpcClientClose();
+
+    /* 重新初始化 Dgram 类型 */
+    SilogIpcInit(SILOG_IPC_TYPE_UNIX_DGRAM);
+
+    /* 初始化服务器 */
+    int32_t ret = SilogIpcServerInit();
+    ASSERT_EQ(ret, SILOG_OK) << "Server init failed: " << ret;
+
+    /* 初始化客户端 */
+    ret = SilogIpcClientInit();
+    ASSERT_EQ(ret, SILOG_OK) << "Client init failed: " << ret;
+
+    /* 发送数据 */
+    const char *testData = "Hello from client";
+    ret = SilogIpcClientSend(testData, strlen(testData));
+    EXPECT_EQ(ret, SILOG_OK) << "Client send failed: " << ret;
+
+    /* 接收数据 */
+    char buffer[256] = {0};
+    int32_t recvLen = SilogIpcServerRecv(buffer, sizeof(buffer));
+    EXPECT_GT(recvLen, 0) << "Server recv failed: " << recvLen;
+    if (recvLen > 0) {
+        EXPECT_STREQ(buffer, testData);
+    }
+
+    /* 清理 */
+    SilogIpcClientClose();
+    SilogIpcServerClose();
+}
+
+// 测试：多次发送接收
+TEST(IpcIntegrationTest, MultipleSendRecv)
+{
+    SilogIpcInit(SILOG_IPC_TYPE_UNIX_DGRAM);
+    ASSERT_EQ(SilogIpcServerInit(), SILOG_OK);
+    ASSERT_EQ(SilogIpcClientInit(), SILOG_OK);
+
+    const char *messages[] = {"First", "Second", "Third"};
+    char buffer[256];
+
+    for (const char *msg : messages) {
+        // 发送
+        EXPECT_EQ(SilogIpcClientSend(msg, strlen(msg)), SILOG_OK);
+
+        // 接收
+        (void)memset_s(buffer, sizeof(buffer), 0, sizeof(buffer));
+        int32_t recvLen = SilogIpcServerRecv(buffer, sizeof(buffer));
+        EXPECT_GT(recvLen, 0);
+        if (recvLen > 0) {
+            EXPECT_STREQ(buffer, msg);
+        }
+    }
+
+    SilogIpcClientClose();
+    SilogIpcServerClose();
+}
+
+// 测试：接收缓冲区太小
+TEST(IpcIntegrationTest, SmallRecvBuffer)
+{
+    SilogIpcInit(SILOG_IPC_TYPE_UNIX_DGRAM);
+    ASSERT_EQ(SilogIpcServerInit(), SILOG_OK);
+    ASSERT_EQ(SilogIpcClientInit(), SILOG_OK);
+
+    const char *testData = "Hello World";
+    EXPECT_EQ(SilogIpcClientSend(testData, strlen(testData)), SILOG_OK);
+
+    // 使用小缓冲区接收（会截断）
+    char buffer[5] = {0};
+    int32_t recvLen = SilogIpcServerRecv(buffer, sizeof(buffer));
+    // 截断情况下返回实际接收的字节数
+    EXPECT_GT(recvLen, 0);
+
+    SilogIpcClientClose();
+    SilogIpcServerClose();
+}
+
+// 测试：服务器接收空数据
+TEST(IpcIntegrationTest, EmptyRecv)
+{
+    SilogIpcInit(SILOG_IPC_TYPE_UNIX_DGRAM);
+    ASSERT_EQ(SilogIpcServerInit(), SILOG_OK);
+    ASSERT_EQ(SilogIpcClientInit(), SILOG_OK);
+
+    // 发送空数据
+    EXPECT_EQ(SilogIpcClientSend("", 0), SILOG_OK);
+
+    char buffer[256];
+    int32_t recvLen = SilogIpcServerRecv(buffer, sizeof(buffer));
+    EXPECT_EQ(recvLen, 0);
+
+    SilogIpcClientClose();
+    SilogIpcServerClose();
+}
+
+// 测试：未初始化时发送/接收
+TEST(IpcIntegrationTest, OperationsWithoutInit)
+{
+    // 确保关闭所有连接
+    SilogIpcClientClose();
+    SilogIpcServerClose();
+
+    // 不初始化直接操作
+    // 返回值取决于全局状态：
+    // - 如果 clientSend 为 NULL，返回 SILOG_NOT_IMPLEMENTED
+    // - 如果 clientSend 不为 NULL 但 fd < 0，返回 SILOG_NET_FILE_ERROR
+    const char *testData = "Test";
+    int32_t sendRet = SilogIpcClientSend(testData, strlen(testData));
+    EXPECT_TRUE(sendRet == SILOG_NET_FILE_ERROR || sendRet == SILOG_NOT_IMPLEMENTED)
+        << "Expected SILOG_NET_FILE_ERROR or SILOG_NOT_IMPLEMENTED, got " << sendRet;
+
+    char buffer[256];
+    int32_t recvRet = SilogIpcServerRecv(buffer, sizeof(buffer));
+    EXPECT_TRUE(recvRet == 0 || recvRet == SILOG_NOT_IMPLEMENTED)
+        << "Expected 0 or SILOG_NOT_IMPLEMENTED, got " << recvRet;
+}
+
+// 测试：重复初始化（应该使用第一次的类型）
+TEST(IpcIntegrationTest, DoubleInit)
+{
+    // 注意：由于全局状态，无法真正重置 isInit 标志
+    // 这个测试主要验证重复调用 Init 不会崩溃
+    SilogIpcInit(SILOG_IPC_TYPE_UNIX_STREAM);
+    SilogIpcInit(SILOG_IPC_TYPE_UNIX_DGRAM);
+
+    // 测试通过标准：没有崩溃
+    // 实际返回值取决于当前全局状态，不做断言
+    (void)SilogIpcClientInit();
+}
