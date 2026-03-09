@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <pthread.h>
 #include <stdarg.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -34,11 +35,13 @@ SilogDaemonManager g_silogDaemonMgr = {0};
 
 static volatile bool g_remoteEnabled = false;
 static pthread_t g_remoteThread = 0;
-static volatile bool g_remoteRunning = false;
+static atomic_bool g_remoteRunning = false;
 
 /* ==================== 守护进程控制标志 ==================== */
 
-static volatile bool g_daemonRunning = false;
+static atomic_bool g_daemonRunning = false;
+static pthread_t g_recvThread = 0;   // 接收线程 ID，用于等待线程结束
+static pthread_t g_writeThread = 0;  // 写入线程 ID，用于等待线程结束
 
 /*
     至少需要三个线程，
@@ -46,6 +49,7 @@ static volatile bool g_daemonRunning = false;
     2、日志写入线程：负责从缓冲区读取日志数据，并写入文件
     3、日志传输线程：负责将日志数据通过网络传输到指定客户端
 */
+
 STATIC void *SilogDaemonRecvThreadFunc(void *arg)
 {
     SilogIpcInit(SILOG_IPC_TYPE_UNIX_DGRAM);
@@ -56,17 +60,8 @@ STATIC void *SilogDaemonRecvThreadFunc(void *arg)
         return NULL;
     }
 
-    ret = SilogMpscQueueInit(&g_silogDaemonMgr.logQueue, sizeof(logEntry_t), DAEMON_LOG_QUEUE_CAPACITY);
-    if (ret != SILOG_OK) {
-        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "SilogMpscQueueInit failed: %d", ret);
-        SilogIpcServerClose();
-        return NULL;
-    }
-
-    g_daemonRunning = true;
-
     logEntry_t entry;
-    while (g_daemonRunning) {
+    while (atomic_load(&g_daemonRunning)) {
         int32_t n = SilogIpcServerRecv(&entry, sizeof(logEntry_t));
         if (n > 0) {
             ret = SilogMpscQueuePush(&g_silogDaemonMgr.logQueue, &entry);
@@ -84,11 +79,8 @@ STATIC void *SilogDaemonRecvThreadFunc(void *arg)
 
 STATIC int32_t SilogDaemonRecvThreadInit()
 {
-    pthread_t recv_thread;
-    if (pthread_create(&recv_thread, NULL, SilogDaemonRecvThreadFunc, NULL) != 0) {
-        return SILOG_THREAD_CREATE;
-    }
-    if (pthread_detach(recv_thread) != 0) {
+    if (pthread_create(&g_recvThread, NULL, SilogDaemonRecvThreadFunc, NULL) != 0) {
+        g_recvThread = 0;
         return SILOG_THREAD_CREATE;
     }
 
@@ -102,7 +94,7 @@ STATIC void *SilogDaemonWriteThreadFunc(void *arg)
     char timebuf[TIME_BUF_SIZE];
     char logbuf[LOG_MSG_BUF_SIZE];
 
-    while (g_daemonRunning) {
+    while (atomic_load(&g_daemonRunning)) {
         int32_t ret = SilogMpscQueuePop(&g_silogDaemonMgr.logQueue, &entry);
         if (ret == SILOG_OK) {
             // 格式化日志
@@ -138,12 +130,8 @@ STATIC void *SilogDaemonWriteThreadFunc(void *arg)
 
 STATIC int32_t SilogDaemonWriteThreadInit()
 {
-    pthread_t write_thread;
-    if (pthread_create(&write_thread, NULL, SilogDaemonWriteThreadFunc, NULL) != 0) {
-        return SILOG_THREAD_CREATE;
-    }
-    if (pthread_detach(write_thread) != 0) {
-        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "pthread_detach failed");
+    if (pthread_create(&g_writeThread, NULL, SilogDaemonWriteThreadFunc, NULL) != 0) {
+        g_writeThread = 0;
         return SILOG_THREAD_CREATE;
     }
 
@@ -153,7 +141,7 @@ STATIC int32_t SilogDaemonWriteThreadInit()
 int32_t SilogDaemonInit(void)
 {
     /* 如果已经在运行，直接返回 */
-    if (g_daemonRunning) {
+    if (atomic_load(&g_daemonRunning)) {
         return SILOG_OK;
     }
 
@@ -169,6 +157,14 @@ int32_t SilogDaemonInit(void)
     int32_t ret = SilogFileManagerInit(NULL);
     if (ret != SILOG_OK) {
         SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "SilogFileManagerInit failed: %d", ret);
+        return ret;
+    }
+
+    /* 初始化 MPSC 队列（在主线程中初始化，避免线程竞争） */
+    ret = SilogMpscQueueInit(&g_silogDaemonMgr.logQueue, sizeof(logEntry_t), DAEMON_LOG_QUEUE_CAPACITY);
+    if (ret != SILOG_OK) {
+        SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "SilogMpscQueueInit failed: %d", ret);
+        SilogFileManagerDeinit();
         return ret;
     }
 
@@ -197,17 +193,26 @@ int32_t SilogDaemonInit(void)
         /* 远程服务初始化失败不阻断主流程 */
     }
 
-    g_daemonRunning = true;
+    atomic_store(&g_daemonRunning, true);
     return SILOG_OK;
 }
 
 void SilogDaemonDeinit(void)
 {
     /* 停止守护进程线程 */
-    g_daemonRunning = false;
+    atomic_store(&g_daemonRunning, false);
 
-    /* 给线程一些时间退出 */
-    usleep(100000); /* 100ms */
+    /* 等待接收线程结束 */
+    if (g_recvThread != 0) {
+        pthread_join(g_recvThread, NULL);
+        g_recvThread = 0;
+    }
+
+    /* 等待写入线程结束 */
+    if (g_writeThread != 0) {
+        pthread_join(g_writeThread, NULL);
+        g_writeThread = 0;
+    }
 
     /* 反初始化远程服务 */
     SilogDaemonRemoteDeinit();
@@ -220,7 +225,6 @@ void SilogDaemonDeinit(void)
 
     /* 销毁 MPSC 队列（如果已初始化） */
     SilogMpscQueueDestroy(&g_silogDaemonMgr.logQueue);
-    (void)memset_s(&g_silogDaemonMgr, sizeof(g_silogDaemonMgr), 0, sizeof(g_silogDaemonMgr));
 }
 
 /* ==================== 远程服务实现 ==================== */
@@ -233,7 +237,7 @@ STATIC void *SilogDaemonRemoteThreadFunc(void *arg)
     (void)arg;
     SILOG_PRELOG_I(SILOG_PRELOG_DAEMON, "Remote service thread started");
 
-    while (g_remoteRunning) {
+    while (atomic_load(&g_remoteRunning)) {
         /* 接受新连接（非阻塞） */
         (void)SilogRemoteAccept();
         usleep(10000); /* 10ms 轮询间隔 */
@@ -265,7 +269,7 @@ int32_t SilogDaemonRemoteInit(const SilogDaemonRemoteConfig *config)
     }
 
     /* 启动远程服务线程 */
-    g_remoteRunning = true;
+    atomic_store(&g_remoteRunning, true);
     if (pthread_create(&g_remoteThread, NULL, SilogDaemonRemoteThreadFunc, NULL) != 0) {
         SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "Failed to create remote thread");
         SilogRemoteDeinit();
@@ -285,7 +289,7 @@ void SilogDaemonRemoteDeinit(void)
     }
 
     /* 停止远程服务线程 */
-    g_remoteRunning = false;
+    atomic_store(&g_remoteRunning, false);
     if (g_remoteThread != 0) {
         pthread_join(g_remoteThread, NULL);
         g_remoteThread = 0;

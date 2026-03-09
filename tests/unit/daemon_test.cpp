@@ -23,6 +23,9 @@ class DaemonTest : public ::testing::Test {
         char tmpDir[] = "/tmp/silog_daemon_test_XXXXXX";
         testDir = mkdtemp(tmpDir);
 
+        // 强制清理 IPC 资源（防止前一个测试残留）
+        unlink("/tmp/logd.sock");
+
         // 确保完全清理
         SilogDaemonDeinit();
     }
@@ -99,6 +102,9 @@ class DaemonRemoteTest : public ::testing::Test {
   protected:
     void SetUp() override
     {
+        // 强制清理 IPC 资源（防止前一个测试残留）
+        unlink("/tmp/logd.sock");
+
         // 完全清理
         SilogDaemonDeinit();
         SilogDaemonRemoteDeinit();
@@ -268,6 +274,9 @@ class DaemonIntegrationTest : public ::testing::Test {
         // 创建唯一的测试目录
         char tmpDir[] = "/tmp/silog_integration_test_XXXXXX";
         testDir = mkdtemp(tmpDir);
+
+        // 强制清理 IPC 资源（防止前一个测试残留）
+        unlink("/tmp/logd.sock");
 
         // 完全清理
         SilogDaemonDeinit();

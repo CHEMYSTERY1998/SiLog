@@ -15,7 +15,7 @@ target_include_directories(silog_reliabilitytest
 
 target_link_libraries(silog_reliabilitytest
     PRIVATE silog_common
-    PRIVATE gtest_main
+    PRIVATE GTest::gtest_main
 )
 
 include(GoogleTest)

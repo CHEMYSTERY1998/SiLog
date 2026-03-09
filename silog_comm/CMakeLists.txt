@@ -1,6 +1,6 @@
 # 公共库，供其他模块依赖
 add_library(
-  silog_common STATIC
+  silog_common SHARED
   ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_utils.c
   ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_ipc.c
   ${CMAKE_CURRENT_SOURCE_DIR}/src/silog_time.c

@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -73,9 +74,9 @@ typedef struct {
     pthread_mutex_t lock;     // 文件操作锁
 
     // 压缩线程相关
-    pthread_t compressThread;     // 压缩线程
-    SiLogMpscQueue compressQueue; // 压缩任务队列
-    bool compressThreadRunning;   // 压缩线程运行标志
+    pthread_t compressThread;          // 压缩线程
+    SiLogMpscQueue compressQueue;      // 压缩任务队列
+    atomic_bool compressThreadRunning; // 压缩线程运行标志
 } SilogFileManager;
 
 static SilogFileManager g_fileManager = {
@@ -235,7 +236,7 @@ STATIC void *SilogFileManagerCompressThread(void *arg)
 {
     (void)arg;
 
-    while (g_fileManager.compressThreadRunning) {
+    while (atomic_load(&g_fileManager.compressThreadRunning)) {
         CompressTask task;
         int32_t ret = SilogMpscQueuePop(&g_fileManager.compressQueue, &task);
         if (ret == SILOG_OK) {
@@ -410,7 +411,7 @@ STATIC int32_t SilogFileManagerInitWithConfig(const SilogLogFileConfig *config)
     }
 
     // 启动压缩线程
-    g_fileManager.compressThreadRunning = true;
+    atomic_store(&g_fileManager.compressThreadRunning, true);
     int pthreadRet = pthread_create(&g_fileManager.compressThread, NULL, SilogFileManagerCompressThread, NULL);
     if (pthreadRet != 0) {
         SILOG_PRELOG_E(SILOG_PRELOG_DAEMON, "Failed to create compress thread: %s", strerror(pthreadRet));
@@ -483,8 +484,8 @@ void SilogFileManagerDeinit(void)
     g_fileManager.initialized = false;
 
     // 停止压缩线程
-    if (g_fileManager.compressThreadRunning) {
-        g_fileManager.compressThreadRunning = false;
+    if (atomic_load(&g_fileManager.compressThreadRunning)) {
+        atomic_store(&g_fileManager.compressThreadRunning, false);
         pthread_mutex_unlock(&g_fileManager.lock);
 
         // 等待压缩线程结束

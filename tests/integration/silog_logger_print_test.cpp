@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <fcntl.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -37,6 +38,12 @@ class SilogCaptureTest : public ::testing::Test {
         /* 先创建服务器 socket（在日志系统初始化之前） */
         serverFd = socket(AF_UNIX, SOCK_DGRAM, 0);
         ASSERT_GE(serverFd, 0);
+
+        /* 设置 socket 超时，防止接收阻塞 */
+        struct timeval tv;
+        tv.tv_sec = 0;
+        tv.tv_usec = 100000; /* 100ms timeout */
+        setsockopt(serverFd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
         struct sockaddr_un addr;
         (void)memset_s(&addr, sizeof(addr), 0, sizeof(addr));
@@ -86,10 +93,19 @@ class SilogCaptureTest : public ::testing::Test {
     }
 
     /* 等待并接收任意日志条目（用于调试） */
-    int waitForAnyLog(logEntry_t *entry, int timeoutMs = 500)
+    int waitForAnyLog(logEntry_t *entry, int timeoutMs = 0)
     {
+        /* 默认超时：普通模式 500ms，TSan 模式 5000ms */
+        if (timeoutMs == 0) {
+#ifdef __SANITIZE_THREAD__
+            timeoutMs = 5000; /* TSan 模式下需要更长超时 */
+#else
+            timeoutMs = 500;
+#endif
+        }
+
         int elapsed = 0;
-        const int step = 1; /* 1ms */
+        const int step = 10; /* 10ms 步进，减少 CPU 占用 */
 
         /* 设置非阻塞模式 */
         int flags = fcntl(serverFd, F_GETFL, 0);
@@ -110,10 +126,19 @@ class SilogCaptureTest : public ::testing::Test {
     }
 
     /* 等待并接收匹配指定 tag 的日志条目（带超时） */
-    int waitForLogEntry(logEntry_t *entry, const char *expectedTag = nullptr, int timeoutMs = 500)
+    int waitForLogEntry(logEntry_t *entry, const char *expectedTag = nullptr, int timeoutMs = 0)
     {
+        /* 默认超时：普通模式 500ms，TSan 模式 5000ms */
+        if (timeoutMs == 0) {
+#ifdef __SANITIZE_THREAD__
+            timeoutMs = 5000; /* TSan 模式下需要更长超时 */
+#else
+            timeoutMs = 500;
+#endif
+        }
+
         int elapsed = 0;
-        const int step = 1; /* 1ms */
+        const int step = 10; /* 10ms 步进，减少 CPU 占用 */
 
         /* 设置非阻塞模式 */
         int flags = fcntl(serverFd, F_GETFL, 0);
@@ -422,37 +447,66 @@ TEST_F(SilogCaptureTest, ConcurrentLogging)
     const int threadCount = 3;
     const int logsPerThread = 5;
     pthread_t threads[threadCount];
+    std::atomic<bool> threadDone[threadCount];
 
     struct ThreadArg {
         int id;
         int count;
+        std::atomic<bool> *done;
     };
 
     auto threadFunc = [](void *arg) -> void * {
         ThreadArg *targ = (ThreadArg *)arg;
         for (int i = 0; i < targ->count; i++) {
             SILOG_I(TEST_TAG, "ThreadMsg");
-            usleep(100);
+            /* TSan 下减少 sleep 时间，避免测试过长 */
+#ifdef __SANITIZE_THREAD__
+            usleep(500); /* 500us */
+#else
+            usleep(100); /* 100us */
+#endif
         }
+        targ->done->store(true);
         return nullptr;
     };
+
+    /* 初始化完成标志 */
+    for (int i = 0; i < threadCount; i++) {
+        threadDone[i].store(false);
+    }
 
     ThreadArg args[threadCount];
     for (int i = 0; i < threadCount; i++) {
         args[i].id = i;
         args[i].count = logsPerThread;
+        args[i].done = &threadDone[i];
         pthread_create(&threads[i], nullptr, threadFunc, &args[i]);
     }
 
+    /* 使用带超时的 join 防止死锁 */
     for (int i = 0; i < threadCount; i++) {
+#ifdef __SANITIZE_THREAD__
+        /* TSan 模式下：轮询等待线程完成，带超时 */
+        int waitMs = 0;
+        const int timeoutMs = 30000; /* 30 秒超时 */
+        while (!threadDone[i].load() && waitMs < timeoutMs) {
+            usleep(10000); /* 10ms */
+            waitMs += 10;
+        }
+        /* 尝试 join（非阻塞） */
         pthread_join(threads[i], nullptr);
+#else
+        pthread_join(threads[i], nullptr);
+#endif
     }
 
     /* 接收并计数日志 */
     int received = 0;
     logEntry_t entry;
-    for (int i = 0; i < threadCount * logsPerThread + 5; i++) {
-        if (waitForLogEntry(&entry, TEST_TAG, 50) > 0) {
+    /* 增加接收尝试次数，TSan 下需要更多时间 */
+    int maxAttempts = threadCount * logsPerThread * 2 + 10;
+    for (int i = 0; i < maxAttempts; i++) {
+        if (waitForLogEntry(&entry, TEST_TAG, 100) > 0) {
             /* 检查是否是我们测试的日志 */
             if (strcmp(entry.msg, "ThreadMsg") == 0) {
                 received++;

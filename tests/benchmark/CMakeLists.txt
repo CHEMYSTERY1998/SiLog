@@ -15,7 +15,7 @@ target_include_directories(silog_benchmark
 
 target_link_libraries(silog_benchmark
     PRIVATE silog_common
-    PRIVATE gtest_main
+    PRIVATE GTest::gtest_main
 )
 
 include(GoogleTest)

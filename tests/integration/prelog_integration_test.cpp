@@ -5,12 +5,14 @@
  * 测试 prelog 模块与 silog_logger 和 silog_daemon 的集成
  */
 
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <string>
 #include <thread>
 #include <chrono>
+#include <unistd.h>
 
 #include "gtest/gtest.h"
 #include "silog_error.h"
@@ -154,20 +156,39 @@ TEST_F(PrelogIntegrationTest,ConcurrentLevelFiltering)
     std::thread threads[numThreads];
 
     // 创建多个线程，每个线程写入不同级别的日志
+    std::atomic<bool> threadDone[numThreads];
     for (int i = 0; i < numThreads; i++) {
-        threads[i] = std::thread([i, logsPerThread]() {
+        threadDone[i].store(false);
+        threads[i] = std::thread([i, logsPerThread, &threadDone]() {
             for (int j = 0; j < logsPerThread; j++) {
                 SILOG_PRELOG_D("SILOG_PRELOG_COMM", "Thread %d Debug %d", i, j);  // 应该被过滤
                 SILOG_PRELOG_I("SILOG_PRELOG_COMM", "Thread %d Info %d", i, j);   // 应该被过滤
                 SILOG_PRELOG_W("SILOG_PRELOG_COMM", "Thread %d Warning %d", i, j); // 应该被记录
                 SILOG_PRELOG_E("SILOG_PRELOG_COMM", "Thread %d Error %d", i, j);   // 应该被记录
             }
+            threadDone[i].store(true);
         });
     }
 
-    // 等待所有线程完成
+    // 等待所有线程完成（带超时）
     for (int i = 0; i < numThreads; i++) {
-        threads[i].join();
+        int waitMs = 0;
+#ifdef __SANITIZE_THREAD__
+        const int timeoutMs = 60000; /* TSan 下 60 秒超时 */
+#else
+        const int timeoutMs = 30000; /* 正常模式 30 秒超时 */
+#endif
+        while (!threadDone[i].load() && waitMs < timeoutMs) {
+            usleep(10000);
+            waitMs += 10;
+        }
+        if (threadDone[i].load()) {
+            threads[i].join();
+        } else {
+            // 超时，detach 线程避免阻塞
+            threads[i].detach();
+            ADD_FAILURE() << "Thread " << i << " join timeout";
+        }
     }
 
     SilogPrelogDeinit();

@@ -254,10 +254,20 @@ TEST_F(RemoteIntegrationTest, ConcurrentConnections)
     EXPECT_TRUE(StartServer(TEST_INTEGRATION_PORT, TOTAL_CLIENTS));
 
     std::atomic<int> successCount{0};
+    std::atomic<bool> threadDone[THREAD_COUNT];
     pthread_t threads[THREAD_COUNT];
 
+    for (int i = 0; i < THREAD_COUNT; i++) {
+        threadDone[i].store(false);
+    }
+
+    struct ThreadArg {
+        std::atomic<int> *count;
+        std::atomic<bool> *done;
+    };
+
     auto connectFunc = [](void *arg) -> void * {
-        auto *count = static_cast<std::atomic<int> *>(arg);
+        auto *targ = static_cast<ThreadArg *>(arg);
         uint16_t port = TEST_INTEGRATION_PORT;
 
         for (int i = 0; i < CLIENTS_PER_THREAD; i++) {
@@ -271,28 +281,55 @@ TEST_F(RemoteIntegrationTest, ConcurrentConnections)
             addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
             if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == 0) {
+#ifdef __SANITIZE_THREAD__
+                usleep(5000); /* TSan 下减少延迟 */
+#else
                 usleep(30000);
-                (*count)++;
+#endif
+                (*targ->count)++;
             }
             close(fd);
         }
+        targ->done->store(true);
         return nullptr;
     };
 
+    ThreadArg args[THREAD_COUNT];
     // 启动连接线程
     for (int i = 0; i < THREAD_COUNT; i++) {
-        pthread_create(&threads[i], nullptr, connectFunc, &successCount);
+        args[i].count = &successCount;
+        args[i].done = &threadDone[i];
+        pthread_create(&threads[i], nullptr, connectFunc, &args[i]);
     }
 
     // 主线程接受连接
     for (int i = 0; i < TOTAL_CLIENTS; i++) {
+#ifdef __SANITIZE_THREAD__
+        usleep(5000); /* TSan 下减少延迟 */
+#else
         usleep(20000);
+#endif
         SilogRemoteAccept();
     }
 
-    // 等待所有线程完成
+    // 等待所有线程完成（带超时）
     for (int i = 0; i < THREAD_COUNT; i++) {
-        pthread_join(threads[i], nullptr);
+        int waitMs = 0;
+#ifdef __SANITIZE_THREAD__
+        const int timeoutMs = 60000; /* TSan 下 60 秒超时 */
+#else
+        const int timeoutMs = 30000; /* 正常模式 30 秒超时 */
+#endif
+        while (!threadDone[i].load() && waitMs < timeoutMs) {
+            usleep(10000);
+            waitMs += 10;
+        }
+        if (threadDone[i].load()) {
+            pthread_join(threads[i], nullptr);
+        } else {
+            // 超时，记录失败但继续
+            ADD_FAILURE() << "Thread " << i << " join timeout";
+        }
     }
 
     EXPECT_EQ(successCount.load(), TOTAL_CLIENTS);

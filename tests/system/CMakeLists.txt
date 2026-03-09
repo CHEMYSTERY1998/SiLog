@@ -20,7 +20,7 @@ target_link_libraries(silog_systemtest
     PRIVATE silog_common
     PRIVATE silog_dae
     PRIVATE silog_logger
-    PRIVATE gtest_main
+    PRIVATE GTest::gtest_main
     PRIVATE pthread
 )
 

@@ -2,6 +2,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -18,15 +19,9 @@
 #define LOGD_SOCKET_PATH "/tmp/logd.sock"
 
 typedef struct {
-    bool isInit;
-    int32_t sendFd;
-    int32_t recvFd;
-    int32_t (*clientInit)();
-    int32_t (*clientSend)(const void *data, uint32_t len);
-    void (*clientClose)();
-    int32_t (*serverInit)();
-    int32_t (*serverRecv)(void *data, uint32_t len);
-    void (*serverClose)();
+    atomic_bool isInit;
+    atomic_int_least32_t sendFd;
+    atomic_int_least32_t recvFd;
 } SilogIpcAgent;
 
 static SilogIpcAgent g_silogIpcAgent = {0};
@@ -46,15 +41,14 @@ STATIC int32_t setNonblock(int32_t fd)
 
 STATIC int32_t SilogIpcDgramClientInit(void)
 {
-    g_silogIpcAgent.sendFd = socket(AF_UNIX, SOCK_DGRAM, 0);
-    if (g_silogIpcAgent.sendFd < 0) {
+    int32_t fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+    if (fd < 0) {
         SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Failed to create client socket: %s", strerror(errno));
         return SILOG_NET_FILE_CREATE;
     }
-    int32_t ret = setNonblock(g_silogIpcAgent.sendFd);
+    int32_t ret = setNonblock(fd);
     if (ret != SILOG_OK) {
-        close(g_silogIpcAgent.sendFd);
-        g_silogIpcAgent.sendFd = -1;
+        close(fd);
         return ret;
     }
     struct sockaddr_un addr;
@@ -63,36 +57,38 @@ STATIC int32_t SilogIpcDgramClientInit(void)
     ret = snprintf_s(addr.sun_path, sizeof(addr.sun_path), sizeof(addr.sun_path) - 1, "%s", LOGD_SOCKET_PATH);
     if (ret < 0) {
         SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Failed to format socket path");
-        close(g_silogIpcAgent.sendFd);
+        close(fd);
         return SILOG_STR_ERR;
     }
 
-    ret = connect(g_silogIpcAgent.sendFd, (struct sockaddr *)&addr, sizeof(addr));
+    ret = connect(fd, (struct sockaddr *)&addr, sizeof(addr));
     if (ret < 0) {
         SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Failed to connect to socket %s: %s", LOGD_SOCKET_PATH, strerror(errno));
-        close(g_silogIpcAgent.sendFd);
+        close(fd);
         return SILOG_NET_CONNECT;
     }
 
+    atomic_store(&g_silogIpcAgent.sendFd, fd);
     return SILOG_OK;
 }
 
 STATIC void SilogIpcDgramClientClose(void)
 {
-    if (g_silogIpcAgent.sendFd >= 0) {
-        close(g_silogIpcAgent.sendFd);
-        g_silogIpcAgent.sendFd = -1;
+    int32_t fd = atomic_exchange(&g_silogIpcAgent.sendFd, -1);
+    if (fd >= 0) {
+        close(fd);
     }
 }
 
 STATIC int32_t SilogIpcDgramClientSend(const void *data, uint32_t len)
 {
-    if (g_silogIpcAgent.sendFd < 0) {
+    int32_t fd = atomic_load(&g_silogIpcAgent.sendFd);
+    if (fd < 0) {
         SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Client send failed: socket not initialized");
         return SILOG_NET_FILE_ERROR;
     }
 
-    int32_t n = send(g_silogIpcAgent.sendFd, data, len, 0);
+    int32_t n = send(fd, data, len, 0);
     if (n < 0) {
         /* 如果发送失败（可能是服务器重启），尝试重新连接 */
         if (errno == ECONNREFUSED || errno == ENOENT) {
@@ -100,8 +96,9 @@ STATIC int32_t SilogIpcDgramClientSend(const void *data, uint32_t len)
             SilogIpcDgramClientClose();
             int32_t ret = SilogIpcDgramClientInit();
             if (ret == SILOG_OK) {
+                fd = atomic_load(&g_silogIpcAgent.sendFd);
                 /* 重试发送 */
-                n = send(g_silogIpcAgent.sendFd, data, len, 0);
+                n = send(fd, data, len, 0);
                 if (n >= 0) {
                     return SILOG_OK;
                 }
@@ -117,40 +114,47 @@ STATIC int32_t SilogIpcDgramClientSend(const void *data, uint32_t len)
 STATIC int32_t SilogIpcDgramServerInit(void)
 {
     unlink(LOGD_SOCKET_PATH); /* 删除旧文件 */
-    g_silogIpcAgent.recvFd = socket(AF_UNIX, SOCK_DGRAM, 0);
-    if (g_silogIpcAgent.recvFd < 0) {
+    int32_t fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+    if (fd < 0) {
         SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Failed to create server socket: %s", strerror(errno));
         return SILOG_NET_FILE_CREATE;
+    }
+    /* 设置非阻塞模式 */
+    int32_t ret = setNonblock(fd);
+    if (ret != SILOG_OK) {
+        close(fd);
+        return ret;
     }
     struct sockaddr_un addr;
     (void)memset_s(&addr, sizeof(addr), 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    int32_t ret =
-        snprintf_s(addr.sun_path, sizeof(addr.sun_path), sizeof(addr.sun_path) - 1, "%s", LOGD_SOCKET_PATH);
+    ret = snprintf_s(addr.sun_path, sizeof(addr.sun_path), sizeof(addr.sun_path) - 1, "%s", LOGD_SOCKET_PATH);
     if (ret < 0) {
         SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Failed to format server socket path");
-        close(g_silogIpcAgent.recvFd);
+        close(fd);
         return SILOG_STR_ERR;
     }
 
-    ret = bind(g_silogIpcAgent.recvFd, (struct sockaddr *)&addr, sizeof(addr));
+    ret = bind(fd, (struct sockaddr *)&addr, sizeof(addr));
     if (ret < 0) {
         SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Failed to bind socket %s: %s", LOGD_SOCKET_PATH, strerror(errno));
-        close(g_silogIpcAgent.recvFd);
+        close(fd);
         return SILOG_NET_FILE_OPEN;
     }
+    atomic_store(&g_silogIpcAgent.recvFd, fd);
 
     return SILOG_OK;
 }
 
 STATIC int32_t SilogIpcDgramServerRecv(void *data, uint32_t len)
 {
-    if (g_silogIpcAgent.recvFd < 0) {
+    int32_t fd = atomic_load(&g_silogIpcAgent.recvFd);
+    if (fd < 0) {
         SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Server recv failed: socket not initialized");
         return 0;
     }
 
-    int32_t n = recv(g_silogIpcAgent.recvFd, data, len, 0);
+    int32_t n = recv(fd, data, len, 0);
     if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
         SILOG_PRELOG_E(SILOG_PRELOG_COMM, "Server recv failed: %s", strerror(errno));
     }
@@ -159,87 +163,78 @@ STATIC int32_t SilogIpcDgramServerRecv(void *data, uint32_t len)
 
 STATIC void SilogIpcDgramServerClose(void)
 {
-    if (g_silogIpcAgent.recvFd >= 0) {
-        close(g_silogIpcAgent.recvFd);
-        g_silogIpcAgent.recvFd = -1;
+    int32_t fd = atomic_exchange(&g_silogIpcAgent.recvFd, -1);
+    if (fd >= 0) {
+        close(fd);
     }
     /* 删除套接字文件 */
     (void)unlink(LOGD_SOCKET_PATH);
 }
 
-STATIC void SilogIpcTypeSetStream(void)
-{
-    g_silogIpcAgent.clientInit = NULL;
-    g_silogIpcAgent.clientSend = NULL;
-    g_silogIpcAgent.clientClose = NULL;
-}
-
-STATIC void SilogIpcTypeSetDgram(void)
-{
-    g_silogIpcAgent.clientInit = SilogIpcDgramClientInit;
-    g_silogIpcAgent.clientSend = SilogIpcDgramClientSend;
-    g_silogIpcAgent.clientClose = SilogIpcDgramClientClose;
-    g_silogIpcAgent.serverInit = SilogIpcDgramServerInit;
-    g_silogIpcAgent.serverRecv = SilogIpcDgramServerRecv;
-    g_silogIpcAgent.serverClose = SilogIpcDgramServerClose;
-}
-
 int32_t SilogIpcClientInit(void)
 {
-    if (g_silogIpcAgent.clientInit == NULL) {
+    if (!atomic_load(&g_silogIpcAgent.isInit)) {
         return SILOG_NOT_IMPLEMENTED;
     }
-    return g_silogIpcAgent.clientInit();
+    return SilogIpcDgramClientInit();
 }
 
 int32_t SilogIpcClientSend(const void *data, uint32_t len)
 {
-    if (g_silogIpcAgent.clientSend == NULL) {
+    if (!atomic_load(&g_silogIpcAgent.isInit)) {
         return SILOG_NOT_IMPLEMENTED;
     }
-    return g_silogIpcAgent.clientSend(data, len);
+    return SilogIpcDgramClientSend(data, len);
 }
 
 void SilogIpcClientClose(void)
 {
-    if (g_silogIpcAgent.clientClose == NULL) {
+    if (!atomic_load(&g_silogIpcAgent.isInit)) {
         return;
     }
-    g_silogIpcAgent.clientClose();
+    SilogIpcDgramClientClose();
 }
 
 int32_t SilogIpcServerInit(void)
 {
-    if (g_silogIpcAgent.serverInit == NULL) {
+    if (!atomic_load(&g_silogIpcAgent.isInit)) {
         return SILOG_NOT_IMPLEMENTED;
     }
-    return g_silogIpcAgent.serverInit();
+    return SilogIpcDgramServerInit();
 }
 
 int32_t SilogIpcServerRecv(void *data, uint32_t len)
 {
-    if (g_silogIpcAgent.serverRecv == NULL) {
+    if (!atomic_load(&g_silogIpcAgent.isInit)) {
         return SILOG_NOT_IMPLEMENTED;
     }
-    return g_silogIpcAgent.serverRecv(data, len);
+    return SilogIpcDgramServerRecv(data, len);
 }
 
 void SilogIpcServerClose(void)
 {
-    if (g_silogIpcAgent.serverClose == NULL) {
+    if (!atomic_load(&g_silogIpcAgent.isInit)) {
         return;
     }
-    g_silogIpcAgent.serverClose();
+    SilogIpcDgramServerClose();
+    /* 重置状态，允许重新初始化（主要用于测试） */
+    atomic_store(&g_silogIpcAgent.isInit, false);
+}
+
+bool SilogIpcIsInit(void)
+{
+    return atomic_load(&g_silogIpcAgent.isInit);
 }
 
 void SilogIpcInit(SilogIpcType_t type)
 {
-    if (g_silogIpcAgent.isInit) {
+    if (atomic_load(&g_silogIpcAgent.isInit)) {
         return;
     }
     if (type == SILOG_IPC_TYPE_UNIX_DGRAM) {
-        SilogIpcTypeSetDgram();
-    } else {
-        SilogIpcTypeSetStream();
+        atomic_store(&g_silogIpcAgent.isInit, true);
+        atomic_store(&g_silogIpcAgent.sendFd, -1);
+        atomic_store(&g_silogIpcAgent.recvFd, -1);
     }
+    /* STREAM 类型未实现，不设置 isInit */
 }

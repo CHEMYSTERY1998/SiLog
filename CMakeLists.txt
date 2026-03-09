@@ -11,16 +11,54 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # 包含公共头文件目录
 include_directories(${PROJECT_SOURCE_DIR}/interface)
 
-# 引入 GoogleTest
-include(FetchContent)
-FetchContent_Declare(
-  googletest
-  GIT_REPOSITORY https://github.com/google/googletest.git
-  GIT_TAG v1.14.0
-)
-# 对于 Windows: 防止覆盖父项目的编译器/链接器设置
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
+# 引入 GoogleTest - 优先使用系统安装版本，否则使用 FetchContent
+find_package(GTest QUIET)
+
+if(GTest_FOUND)
+    message(STATUS "Found system-installed GoogleTest")
+    # CMake 3.20+ 使用 GTest::gtest_main, 旧版本使用 GTest::Main
+    if(NOT TARGET GTest::gtest_main)
+        if(TARGET gtest_main)
+            add_library(GTest::gtest_main ALIAS gtest_main)
+        endif()
+    endif()
+else()
+    message(STATUS "System GoogleTest not found, using FetchContent")
+
+    include(FetchContent)
+
+    # 设置本地缓存目录（下载后会被缓存到这里）
+    set(FETCHCONTENT_BASE_DIR "${PROJECT_SOURCE_DIR}/.cache" CACHE PATH "FetchContent cache directory" FORCE)
+
+    # 检查本地缓存目录（FetchContent 下载后的位置是 googletest-src）
+    set(GTEST_CACHE_DIR "${FETCHCONTENT_BASE_DIR}/googletest-src")
+    if(EXISTS "${GTEST_CACHE_DIR}/CMakeLists.txt")
+        message(STATUS "Using cached GoogleTest from ${GTEST_CACHE_DIR}")
+        set(FETCHCONTENT_SOURCE_DIR_GOOGLETEST "${GTEST_CACHE_DIR}" CACHE PATH "Googletest source directory" FORCE)
+    else()
+        message(STATUS "GoogleTest cache not found, will download from GitHub")
+    endif()
+
+    FetchContent_Declare(
+      googletest
+      GIT_REPOSITORY https://github.com/google/googletest.git
+      GIT_TAG v1.14.0
+      GIT_SHALLOW TRUE
+      GIT_PROGRESS TRUE
+    )
+
+    # 对于 Windows: 防止覆盖父项目的编译器/链接器设置
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+
+    # 创建别名以便统一链接
+    if(TARGET gtest AND NOT TARGET GTest::gtest)
+        add_library(GTest::gtest ALIAS gtest)
+    endif()
+    if(TARGET gtest_main AND NOT TARGET GTest::gtest_main)
+        add_library(GTest::gtest_main ALIAS gtest_main)
+    endif()
+endif()
 
 # 选项：启用 ASan (AddressSanitizer)
 option(ENABLE_ASAN "Enable AddressSanitizer" OFF)

@@ -15,7 +15,7 @@ target_include_directories(silog_concurrencytest
 
 target_link_libraries(silog_concurrencytest
     PRIVATE silog_common
-    PRIVATE gtest_main
+    PRIVATE GTest::gtest_main
 )
 
 include(GoogleTest)

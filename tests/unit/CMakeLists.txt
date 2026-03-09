@@ -29,7 +29,7 @@ target_include_directories(silog_unittest
 target_link_libraries(silog_unittest
     PRIVATE silog_common
     PRIVATE silog_dae
-    PRIVATE gtest_main
+    PRIVATE GTest::gtest_main
 )
 
 include(GoogleTest)

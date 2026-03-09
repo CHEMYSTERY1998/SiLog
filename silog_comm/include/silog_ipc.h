@@ -9,6 +9,7 @@
 #ifndef SILOG_IPC_H
 #define SILOG_IPC_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -66,6 +67,12 @@ int32_t SilogIpcServerRecv(void *data, uint32_t len);
  * @brief 关闭服务端
  */
 void SilogIpcServerClose(void);
+
+/**
+ * @brief 检查 IPC 是否已初始化
+ * @return true 如果已初始化，false 否则
+ */
+bool SilogIpcIsInit(void);
 
 #ifdef __cplusplus
 }
