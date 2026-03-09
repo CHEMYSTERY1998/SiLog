@@ -1,5 +1,6 @@
 .cache
 .vscode/
 build/
+build_test/
 tests/build_test/
 tests/report/

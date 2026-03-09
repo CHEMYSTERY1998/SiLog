@@ -39,7 +39,12 @@ include(GoogleTest)
 # OFF: 使用 add_test 只显示测试套（summary 模式）
 if(ENABLE_TEST_DISCOVERY)
     message(STATUS "Test discovery enabled - individual test cases will be shown")
-    gtest_discover_tests(silog_unittest DISCOVERY_MODE PRE_TEST)
+    # DISCOVERY_MODE PRE_TEST 需要 CMake 3.18+
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.18")
+        gtest_discover_tests(silog_unittest DISCOVERY_MODE PRE_TEST)
+    else()
+        gtest_discover_tests(silog_unittest)
+    endif()
 else()
     message(STATUS "Test discovery disabled - only test suites will be shown")
     add_test(NAME silog_unittest COMMAND silog_unittest)
